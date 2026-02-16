@@ -97,7 +97,6 @@ export const SendTokenProvider: React.FC<{ children: ReactNode }> = ({
       const payload: ExecuteParams = {
         to: receiverAddress as `0x${string}`,
         value: value,
-        data: "0x",
       }
 
       if (isOpenedInIframe) {
