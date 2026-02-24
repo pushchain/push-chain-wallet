@@ -36,7 +36,7 @@
     "@human.tech/waap-sdk": "^1.1.0",
     "@metamask/sdk": "^0.32.0",
     "@noble/hashes": "^1.0.0",
-    "@pushchain/core": "^4.0.12",
+    "@pushchain/core": "^4.0.13",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
     "@radix-ui/react-switch": "^1.1.0",
