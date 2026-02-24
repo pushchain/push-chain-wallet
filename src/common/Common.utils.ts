@@ -1,4 +1,6 @@
+import { Wallet } from "../context/GlobalContext";
 import { PushWalletAppConnectionData } from "./Common.types";
+import { PushWallet } from "../services/pushWallet/pushWallet";
 
 export const centerMaskWalletAddress = (address: string, length?: number) => {
   if (address) {
@@ -42,6 +44,16 @@ export const isUIKitVersion = (v: string) => {
   const version = searchParams.get("version");
 
   return !!app && (version >= v);
+};
+
+export const isClassicPushWallet = (w: Wallet | null): w is PushWallet => {
+  return (
+    !!w &&
+    typeof w === "object" &&
+    "mnemonic" in w &&
+    "storeMnemonicShareAsEncryptedTx" in w &&
+    "walletToEncDerivedKey" in w
+  );
 };
 
 export const getAllAppConnections = (): PushWalletAppConnectionData[] =>

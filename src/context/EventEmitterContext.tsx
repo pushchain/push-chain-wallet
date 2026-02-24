@@ -305,7 +305,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signMessage(message);
+      const signature = await walletRef.current.universalSigner.signMessage(message);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_MESSAGE,
@@ -331,7 +331,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signAndSendTransaction(txn);
+      const signature = await walletRef.current.universalSigner.signAndSendTransaction(txn);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TRANSACTION,
@@ -362,7 +362,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signTypedData(typedData);
+      const signature = await walletRef.current.universalSigner.signTypedData(typedData);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TYPED_DATA,
@@ -408,7 +408,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       payload: appConnections,
     });
 
-    const universalAccount = walletRef?.current?.account;
+    const universalAccount = walletRef?.current?.universalSigner.account;
 
     localStorage.setItem(
       "walletInfo",
@@ -490,7 +490,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const handleUserLoggedIn = () => {
 
-    const account = walletRef?.current?.account;
+    const account = walletRef?.current?.universalSigner.account;
 
     sendMessageToMainTab({
       type: WALLET_TO_APP_ACTION.IS_LOGGED_IN,

@@ -60,10 +60,10 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
         sessionStorage.removeItem("jwt");
         localStorage.removeItem("pw_user_email");
         localStorage.removeItem("walletInfo");
-        
-        logoutWaap();
 
         navigate(persistQuery(APP_ROUTES.AUTH));
+
+        logoutWaap();
 
         if (isOpenedInIframe) {
             handleLogOutEvent();
@@ -142,7 +142,9 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
                                 label="Secret Recovery Phrase"
                                 icon={<Asterisk />}
                                 onClick={() => {
-                                    window.open('https://waap.xyz/settings/privacy-and-security/export-key', '_blank');
+                                    (isUIKitVersion('5') || !isOpenedInIframe)
+                                        ? window.open('https://waap.xyz/settings/privacy-and-security/export-key', '_blank')
+                                        : setActiveState("recoveryPhrase");
                                 }}
                             />)}
                             <MenuItem

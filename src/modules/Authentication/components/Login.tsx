@@ -1,7 +1,7 @@
-import { FC, useEffect } from "react";
-import { Box, Button, Text } from "../../../blocks";
-import { DrawerWrapper, getAppParamValue, LoadingContent, PoweredByPush } from "../../../common";
-import { WalletState } from "../Authentication.types";
+import { FC } from "react";
+import { Box, Button, Text, TextInput, Front } from "../../../blocks";
+import { DrawerWrapper, getAppParamValue, LoadingContent, PoweredByPush, getVersionParamValue, isUIKitVersion } from "../../../common";
+import { WalletState, SocialProvider } from "../Authentication.types";
 import { APP_ROUTES } from "../../../constants";
 import { usePersistedQuery } from "../../../common/hooks/usePersistedQuery";
 import { WalletConfig } from "src/types/wallet.types";
@@ -16,6 +16,13 @@ import {
   waapSignAndSendTransaction,
 } from '../../../waap/waapProvider';
 import { useNavigate } from "react-router-dom";
+import * as Yup from "yup";
+import { useFormik } from "formik";
+import {
+  getAuthWindowConfig,
+  getOTPEmailAuthRoute,
+  getPushSocialAuthRoute,
+} from "../Authentication.utils";
 
 export type LoginProps = {
   email: string;
@@ -24,7 +31,11 @@ export type LoginProps = {
   walletConfig: WalletConfig
 };
 
-const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
+const validationSchema = Yup.object().shape({
+  email: Yup.string().email("Invalid email address").required("Required"),
+});
+
+const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig }) => {
   const persistQuery = usePersistedQuery();
   const { loading, loginWithWaapSocial, tryAutoConnect, setLoading } = useWaapAuth();
   const { state, dispatch } = useGlobalState();
@@ -33,14 +44,62 @@ const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
 
   const isOpenedInIframe = !!getAppParamValue();
 
+  const formik = useFormik({
+    initialValues: { email },
+    validationSchema,
+    onSubmit: (values) => {
+      setEmail(values.email);
+      localStorage.setItem("pw_user_email", values.email);
+
+      if (values.email) {
+        if (isOpenedInIframe) {
+
+          const appURL = getAppParamValue();
+          const version = getVersionParamValue();
+          sessionStorage.setItem('App_Connections', appURL);
+          sessionStorage.setItem('UI_kit_version', version);
+
+          window.location.href = getOTPEmailAuthRoute(
+            values.email,
+            APP_ROUTES.VERIFY_EMAIL_OTP
+          );
+
+        } else {
+          window.location.href = getOTPEmailAuthRoute(
+            values.email,
+            persistQuery(APP_ROUTES.VERIFY_EMAIL_OTP)
+          );
+
+        }
+      }
+    }
+  });
+
+  const handleSocialLogin = (provider: SocialProvider) => {
+    if (isOpenedInIframe) {
+      const backendURL = getPushSocialAuthRoute(
+        provider,
+        APP_ROUTES.OAUTH_REDIRECT
+      );
+      window.open(backendURL, "Google OAuth", getAuthWindowConfig());
+    } else {
+      window.location.href = getPushSocialAuthRoute(
+        provider,
+        persistQuery(APP_ROUTES.WALLET)
+      );
+    }
+  };
+
   const handleLogin = async (addr: `0x${string}`) => {
     const w = await PushChain.utils.account.convertExecutorToOriginAccount(addr);
 
     const instance = {
-      signMessage: waapSignMessage,
-      signTypedData: waapSignTypedData,
-      signAndSendTransaction: waapSignAndSendTransaction,
-      account: w.account
+      universalSigner: {
+        signMessage: waapSignMessage,
+        signTypedData: waapSignTypedData,
+        signAndSendTransaction: waapSignAndSendTransaction,
+        account: w.account
+      }
     }
 
     dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
@@ -56,7 +115,7 @@ const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
     });
   }
 
-  const handleSocialLogin = async () => {
+  const handleWaapSocialLogin = async () => {
     const result = await loginWithWaapSocial();
     if (!result) return;
 
@@ -78,9 +137,19 @@ const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
   //   handleReconnect();
   // }, []);
 
+  const hasBasic =
+    !!walletConfig?.loginDefaults?.email ||
+    !!walletConfig?.loginDefaults?.google ||
+    !!walletConfig?.loginDefaults?.phone;
+
+  const hasSocials =
+    !!walletConfig?.loginDefaults?.socials &&
+    Object.values(walletConfig?.loginDefaults?.socials).some(Boolean);
+
   const showEmailLogin = isOpenedInIframe ? walletConfig?.loginDefaults.email : true
   const showGoogleLogin = isOpenedInIframe ? walletConfig?.loginDefaults.google : true
   const showWalletLogin = isOpenedInIframe ? walletConfig?.loginDefaults.wallet.enabled : true
+  const showWaapLogin = isOpenedInIframe ? ( hasBasic || hasSocials ) : true
 
   return (
     <Box
@@ -150,50 +219,69 @@ const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
           width="100%"
           alignItems="center"
         >
-          {showGoogleLogin && (
-            <>
-              <Button
-                variant="outline"
-                block
-                onClick={handleSocialLogin}
-              >
-                Continue with Social login
-              </Button>
-              {/* <Box
-            display="flex"
-            gap="spacing-xs"
-            alignItems="center"
-            justifyContent="center"
-          >
-            {socialLoginConfig.map((social) => (
-              <Button
-                key={social.name}
-                variant="outline"
-                iconOnly={social.icon}
-                css={css`
-                  width: 73px;
-                `}
-                onClick={() =>
-                  handleSocialLogin(
-                    social.name as
-                    | "github"
-                    | "google"
-                    | "discord"
-                    | "twitter"
-                    | "apple"
-                  )
-                }
-              />
-            ))}
-          </Box> */}
+          {
+            (isUIKitVersion('5') || !isOpenedInIframe) ? (
+              <>
+                {showWaapLogin && (
+                  <Button
+                    variant="outline"
+                    block
+                    onClick={handleWaapSocialLogin}
+                  >
+                    Continue with Social login
+                  </Button>
+                )}
+                {(showWaapLogin && showWalletLogin) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+              </>
+            ) : (
+              <>
+                {showEmailLogin && (
+                  <>
+                    <Box width="100%">
+                      <form onSubmit={formik.handleSubmit}>
+                        <TextInput
+                          value={formik.values.email}
+                          onChange={formik.handleChange("email")}
+                          placeholder="Enter your email"
+                          error={formik.touched?.email && Boolean(formik.errors?.email)}
+                          errorMessage={formik.touched?.email ? formik.errors?.email : ""}
+                          trailingIcon={
+                            <Front
+                              size={24}
+                              onClick={() => {
+                                formik.handleSubmit();
+                                setConnectMethod("social");
+                              }}
+                            />
+                          }
+                        />
+                      </form>
+                    </Box>
+                  </>
+                )}
+                {showEmailLogin && showGoogleLogin && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+                {showGoogleLogin && (
+                  <>
+                    <Button
+                      variant="outline"
+                      block
+                      onClick={() => handleSocialLogin('google')}
+                    >
+                      Continue with Google
+                    </Button>
+                  </>
+                )}
 
-            </>
-
-          )}
-
-          {((showGoogleLogin && showWalletLogin) || (showEmailLogin && showWalletLogin)) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
-            OR
-          </Text>)}
+                {((showGoogleLogin && showWalletLogin) || (showEmailLogin && showWalletLogin)) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+              </>
+            )
+          }
 
           {showWalletLogin && <Button
             variant="outline"
@@ -207,7 +295,7 @@ const Login: FC<LoginProps> = ({ setConnectMethod, walletConfig }) => {
         {/* <Text variant="bes-semibold" color="text-brand-medium">
           Recover using Secret Key{" "}
         </Text> */}
-        {loading && (<DrawerWrapper>
+        {(isUIKitVersion('5') || !isOpenedInIframe) && loading && (<DrawerWrapper>
           <LoadingContent
               title={"Verifying..."}
               subTitle={"FInishing signing up in the new window to continue..."}

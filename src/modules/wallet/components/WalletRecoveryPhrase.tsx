@@ -2,7 +2,7 @@ import { Box, Button, Copy, Text, TickCircleFilled } from "blocks";
 import { useEffect, useState } from "react";
 import { useGlobalState } from "../../../context/GlobalContext";
 import { css } from "styled-components";
-import { handleCopy } from "common";
+import { handleCopy, isClassicPushWallet, isUIKitVersion, getAppParamValue } from "common";
 import { useWalletDashboard } from '../../../context/WalletDashboardContext';
 
 const WalletRecoveryPhrase = () => {
@@ -12,12 +12,15 @@ const WalletRecoveryPhrase = () => {
     const { state } = useGlobalState();
     const { setActiveState } = useWalletDashboard();
 
-    // useEffect(() => {
-    //     if (state.wallet.mnemonic) {
-    //         const words = state.wallet.mnemonic.split(" ");
-    //         setPhrase(words);
-    //     }
-    // }, [state.wallet])
+    const isOpenedInIframe = !!getAppParamValue();
+
+    useEffect(() => {
+        if (isUIKitVersion('5') || !isOpenedInIframe) return;
+        if (isClassicPushWallet(state.wallet)) {
+            const words = state.wallet.mnemonic.split(" ");
+            setPhrase(words);
+        }
+    }, [state.wallet])
     
     return (
         <Box
@@ -72,7 +75,11 @@ const WalletRecoveryPhrase = () => {
                         gap='spacing-xxxs'
                         justifyContent='flex-end'
                         cursor='pointer'
-                        onClick={() => handleCopy(state.wallet.mnemonic, setCopied)}
+                        onClick={() => {
+                            if (isClassicPushWallet(state.wallet)) {
+                                handleCopy(state.wallet.mnemonic, setCopied);
+                            }
+                        }}
                     >
                         {copied ? (
                             <TickCircleFilled size={12} color="pw-int-icon-success-bold-color" />

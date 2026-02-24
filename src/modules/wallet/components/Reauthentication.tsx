@@ -4,7 +4,7 @@ import { PoweredByPush } from "../../../common/components";
 import { css } from "styled-components";
 import { APP_ROUTES } from "../../../constants";
 import { useGlobalState } from "../../../context/GlobalContext";
-import { centerMaskWalletAddress } from "../../../common/Common.utils";
+import { centerMaskWalletAddress, isUIKitVersion, getAppParamValue } from "../../../common/Common.utils";
 import { useWaapAuth } from "../../../waap/useWaapAuth";
 import { PushChain } from "@pushchain/core";
 import {
@@ -12,6 +12,7 @@ import {
   waapSignTypedData,
   waapSignAndSendTransaction,
 } from '../../../waap/waapProvider';
+import { getAuthWindowConfig, getOTPEmailAuthRoute, getPushSocialAuthRoute } from "../../Authentication/Authentication.utils";
 
 type ReauthenticationProps = {
     onCancel: () => void;
@@ -22,12 +23,32 @@ const Reauthentication: FC<ReauthenticationProps> = ({ onCancel }) => {
     const { state, dispatch } = useGlobalState();
     const { tryAutoConnect } = useWaapAuth();
 
+    const isOpenedInIframe = !!getAppParamValue();
+
     const handleClose = () => {
         dispatch({ type: "SET_RECONNECT", payload: false });
         onCancel();
     }
 
     const handleClick = async () => {
+        const email = localStorage.getItem("pw_user_email");
+        setLoading(true);
+        if (!email) {
+            const backendURL = getPushSocialAuthRoute(
+                "google",
+                APP_ROUTES.OAUTH_REDIRECT
+            );
+            window.open(backendURL, "Google OAuth", getAuthWindowConfig());
+        } else {
+            const backendURL = getOTPEmailAuthRoute(
+                email,
+                APP_ROUTES.REVERIFY_EMAIL_OTP
+            );
+            window.open(backendURL, "Email OAuth", getAuthWindowConfig());
+        }
+    }
+
+    const handleWaapClick = async () => {
         if (state?.wallet) return;
 
         setLoading(true);
@@ -41,10 +62,12 @@ const Reauthentication: FC<ReauthenticationProps> = ({ onCancel }) => {
         const w = await PushChain.utils.account.convertExecutorToOriginAccount(res.address as `0x${string}`);
 
         const instance = {
-            signMessage: waapSignMessage,
-            signTypedData: waapSignTypedData,
-            signAndSendTransaction: waapSignAndSendTransaction,
-            account: w.account
+            universalSigner: {
+                signMessage: waapSignMessage,
+                signTypedData: waapSignTypedData,
+                signAndSendTransaction: waapSignAndSendTransaction,
+                account: w.account
+            }
         }
     
         dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
@@ -91,7 +114,7 @@ const Reauthentication: FC<ReauthenticationProps> = ({ onCancel }) => {
                 </Box>
 
                 <Button
-                    onClick={handleClick}
+                    onClick={(isUIKitVersion('5') || !isOpenedInIframe) ? handleWaapClick : handleClick}
                     variant="primary"
                     css={css`
                         width: 100%;
@@ -99,7 +122,7 @@ const Reauthentication: FC<ReauthenticationProps> = ({ onCancel }) => {
                     `}
                     loading={loading}
                 >
-                    Continue {state.pushWallet ? `as ${centerMaskWalletAddress(state.pushWallet.address)}` : "with Social Login"}
+                    Continue {state.pushWallet ? `as ${centerMaskWalletAddress(state.pushWallet.address)}` : ((isUIKitVersion('5') || !!isOpenedInIframe) ? "with Social Login" : "with google")}
                 </Button>
             </Box>
 

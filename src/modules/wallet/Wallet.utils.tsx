@@ -3,15 +3,15 @@ import { PushChain } from "@pushchain/core";
 import { createPublicClient, http } from 'viem';
 import { mainnet, sepolia, baseSepolia, arbitrumSepolia, bscTestnet } from 'viem/chains';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
-import { PushWalletSocial } from "../../context/GlobalContext";
+import { Wallet } from "../../context/GlobalContext";
 
-export const getWalletlist = (wallet: PushWalletSocial) => {
+export const getWalletlist = (wallet: Wallet) => {
   const walletList = [];
   if (wallet) {
-    const account = PushChain.utils.account.toChainAgnostic(wallet.account.address, { chain: wallet.account.chain });
+    const account = PushChain.utils.account.toChainAgnostic(wallet.universalSigner.account.address, { chain: wallet.universalSigner.account.chain });
     const walletObj = {
       name: "Push Account",
-      address: wallet.account.address,
+      address: wallet.universalSigner.account.address,
       fullAddress: account,
       isSelected: false,
       type: "push",

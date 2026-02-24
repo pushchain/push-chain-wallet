@@ -80,7 +80,6 @@ const AddTokens: FC = () => {
             return;
         }
         if (res.success) {
-            console.log("Successfully added tokens");
             setActiveState("walletDashboard");
         }
     };

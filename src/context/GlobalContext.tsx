@@ -13,17 +13,22 @@ import {
 import { APP_ROUTES } from "../constants";
 import { useExternalWallet } from "./ExternalWalletContext";
 import { WalletConfig, ExternalWalletType, UniversalAccount, ITypedData } from "../types/wallet.types";
+import { PushWallet } from "../services/pushWallet/pushWallet";
 
 export type PushWalletSocial = {
-  signMessage: (message: Uint8Array) => Promise<Uint8Array>;
-  signTypedData: (typedData: ITypedData) => Promise<Uint8Array>;
-  signAndSendTransaction: (txn: Uint8Array) => Promise<Uint8Array>;
-  account: UniversalAccount;
+  universalSigner: {
+    signMessage: (message: Uint8Array) => Promise<Uint8Array>;
+    signTypedData: (typedData: ITypedData) => Promise<Uint8Array>;
+    signAndSendTransaction: (txn: Uint8Array) => Promise<Uint8Array>;
+    account: UniversalAccount;
+  };
 }
+
+export type Wallet = PushWallet | PushWalletSocial;
 
 // Define the shape of the global state
 export type GlobalState = {
-  wallet: PushWalletSocial | null;
+  wallet: Wallet | null;
   appConnections: PushWalletAppConnectionData[];
   externalWallet: ExternalWalletType | null;
   pushWallet: UniversalAccount | null;
@@ -48,7 +53,7 @@ export type GlobalState = {
 
 // Define actions for state management
 export type GlobalAction =
-  | { type: "INITIALIZE_WALLET"; payload: PushWalletSocial }
+  | { type: "INITIALIZE_WALLET"; payload: Wallet }
   | { type: "SET_APP_CONNECTIONS"; payload: PushWalletAppConnectionData[] }
   | { type: "SET_EXTERNAL_WALLET"; payload: ExternalWalletType }
   | { type: "SET_PUSH_WALLET"; payload: UniversalAccount }
@@ -216,7 +221,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({
           dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
         }
 
-        if (state.wallet?.account) {
+        if (state.wallet?.universalSigner.account) {
           dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
         }
 
@@ -225,7 +230,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({
           dispatch({ type: "SET_EXTERNAL_WALLET", payload: externalWallet });
         }
 
-        if (!stateParam && !storedToken && !externalWallet && !state.wallet?.account) {
+        if (!stateParam && !storedToken && !externalWallet && !state.wallet?.universalSigner.account) {
           dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "rejected" });
         }
       } catch (error) {
