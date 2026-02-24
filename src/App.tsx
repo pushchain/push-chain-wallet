@@ -44,7 +44,7 @@ export default function App() {
   const isOpenedInIframe = !!getAppParamValue();
 
   useEffect(() => {
-    if ((isUIKitVersion('5') || !isOpenedInIframe) && state.walletConfig) ensureWaapInit(isDarkMode, state.walletConfig);
+    if ((isUIKitVersion('5') && state.walletConfig) || !isOpenedInIframe) ensureWaapInit(isDarkMode, state.walletConfig);
   }, [state.walletConfig, isDarkMode]);
 
   return (
