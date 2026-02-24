@@ -12,7 +12,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { startEIP6963Listener } from './providers/utils/eip6963';
 import { useEffect } from "react";
 import { ensureWaapInit } from "./waap/initWaap";
-import { useGlobalState } from "./context/GlobalContext";
 
 const GlobalStyle = createGlobalStyle`
   :root{
@@ -38,7 +37,6 @@ export default function App() {
   const { isDarkMode } = useDarkMode();
 
   const { state } = useAppState();
-  const { state: globalState } = useGlobalState();
   startEIP6963Listener();
 
   const queryClient = new QueryClient();
@@ -46,8 +44,8 @@ export default function App() {
   const isOpenedInIframe = !!getAppParamValue();
 
   useEffect(() => {
-    if (isUIKitVersion('5') || !isOpenedInIframe) ensureWaapInit(isDarkMode, globalState.walletConfig);
-  }, []);
+    if ((isUIKitVersion('5') || !isOpenedInIframe) && state.walletConfig) ensureWaapInit(isDarkMode, state.walletConfig);
+  }, [state.walletConfig, isDarkMode]);
 
   return (
     <ThemeProvider theme={{ ...(isDarkMode ? themeConfig.dark : themeConfig.light), themeOverrides: state.themeOverrides }}>

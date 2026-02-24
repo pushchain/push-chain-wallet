@@ -470,6 +470,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     appDispatch({ type: "SET_THEME_OVERRIDES", payload: { ...data.themeOverrides } });
+    appDispatch({ type: "SET_WALLET_CONFIG", payload: walletConfig });
     dispatch({ type: "WALLET_CONFIG", payload: walletConfig });
   }
 
