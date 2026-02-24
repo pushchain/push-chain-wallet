@@ -29,6 +29,7 @@ import { getOTPEmailAuthRoute, getPushSocialAuthRoute } from "../modules/Authent
 import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
 import { useExternalWallet } from "./ExternalWalletContext";
 import { walletRegistry } from "../providers/WalletProviderRegistry";
+import { useWaapAuth } from "../waap/useWaapAuth";
 
 // Define the shape of the app state
 export type EventEmitterState = {
@@ -88,6 +89,8 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const { connect, setExternalWallet } = useExternalWallet();
 
+  const { logoutWaap } = useWaapAuth();
+
   // TODO: Right now we check the logged in wallet type. But we need to support the functionality of selected wallet type of the app.
 
   // For social login and email
@@ -139,13 +142,13 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
             handleWalletConfigs(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.SIGN_MESSAGE:
-            handleSignAndSendMessage(event.data.data, event.origin);
+            handleSignAndSendMessage(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.SIGN_TRANSACTION:
-            handleSignAndSendTransaction(event.data.data, event.origin);
+            handleSignAndSendTransaction(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.SIGN_TYPED_DATA:
-            handleSignTypedData(event.data.data, event.origin);
+            handleSignTypedData(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.LOG_OUT:
             handleLogOutEvent();
@@ -298,15 +301,11 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const handleSignAndSendMessage = async (message: Uint8Array, origin: string) => {
+  const handleSignAndSendMessage = async (message: Uint8Array) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signMessage(
-        message,
-        origin,
-        getAllAppConnections()
-      );
+      const signature = await walletRef.current.universalSigner.signMessage(message);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_MESSAGE,
@@ -328,15 +327,11 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const handleSignAndSendTransaction = async (txn: Uint8Array, origin: string) => {
+  const handleSignAndSendTransaction = async (txn: Uint8Array) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signAndSendTransaction(
-        txn,
-        origin,
-        getAllAppConnections()
-      );
+      const signature = await walletRef.current.universalSigner.signAndSendTransaction(txn);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TRANSACTION,
@@ -363,15 +358,11 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     types: TypedData;
     primaryType: string;
     message: Record<string, unknown>;
-  }, origin: string) => {
+  }) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
-      const signature = await walletRef.current.signTypedData(
-        typedData,
-        origin,
-        getAllAppConnections()
-      );
+      const signature = await walletRef.current.universalSigner.signTypedData(typedData);
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TYPED_DATA,
@@ -417,17 +408,17 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       payload: appConnections,
     });
 
-    const universalSigner = walletRef?.current?.universalSigner;
+    const universalAccount = walletRef?.current?.universalSigner.account;
 
     localStorage.setItem(
       "walletInfo",
-      JSON.stringify(universalSigner.account)
+      JSON.stringify(universalAccount)
     );
 
     sendMessageToMainTab({
       type: WALLET_TO_APP_ACTION.APP_CONNECTION_SUCCESS,
       data: {
-        account: universalSigner.account,
+        account: universalAccount,
       },
     });
   };
@@ -479,6 +470,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     appDispatch({ type: "SET_THEME_OVERRIDES", payload: { ...data.themeOverrides } });
+    appDispatch({ type: "SET_WALLET_CONFIG", payload: walletConfig });
     dispatch({ type: "WALLET_CONFIG", payload: walletConfig });
   }
 
@@ -499,12 +491,12 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const handleUserLoggedIn = () => {
 
-    const universalSigner = walletRef?.current?.universalSigner
+    const account = walletRef?.current?.universalSigner.account;
 
     sendMessageToMainTab({
       type: WALLET_TO_APP_ACTION.IS_LOGGED_IN,
       data: {
-        account: universalSigner.account ?? null,
+        account: account ?? null,
       },
     });
   };
@@ -514,6 +506,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     sessionStorage.removeItem("jwt");
     localStorage.removeItem("pw_user_email");
     localStorage.removeItem("walletInfo");
+    logoutWaap();
 
     sendMessageToMainTab({
       type: WALLET_TO_APP_ACTION.IS_LOGGED_OUT,

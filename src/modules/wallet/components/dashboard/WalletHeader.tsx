@@ -31,6 +31,7 @@ import BlockiesSvg from "blockies-react-svg";
 import { FC, useState } from "react";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { convertCaipToObject } from "../../Wallet.utils";
+import { useWaapAuth } from "../../../../waap/useWaapAuth";
 
 type WalletHeaderProps = {
     walletAddress: string;
@@ -45,6 +46,7 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
     const navigate = useNavigate();
     const persistQuery = usePersistedQuery();
     const { handleLogOutEvent } = useEventEmitterContext();
+    const { logoutWaap } = useWaapAuth();
 
     const isOpenedInIframe = !!getAppParamValue();
 
@@ -60,6 +62,8 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
         localStorage.removeItem("walletInfo");
 
         navigate(persistQuery(APP_ROUTES.AUTH));
+
+        logoutWaap();
 
         if (isOpenedInIframe) {
             handleLogOutEvent();
@@ -138,7 +142,9 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
                                 label="Secret Recovery Phrase"
                                 icon={<Asterisk />}
                                 onClick={() => {
-                                    setActiveState('recoveryPhrase');
+                                    (isUIKitVersion('5') || !isOpenedInIframe)
+                                        ? window.open('https://waap.xyz/settings/privacy-and-security/export-key', '_blank')
+                                        : setActiveState("recoveryPhrase");
                                 }}
                             />)}
                             <MenuItem

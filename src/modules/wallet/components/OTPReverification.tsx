@@ -73,7 +73,6 @@ const OTPReverification: FC<OTPReverificationProps> = ({ params, onClose, onCanc
             const challengeId = params.challengeId;
             const email = params.email;
             const otpString = otp.join('');
-            console.log(state, challengeId, email, otpString);
             const response = await verifyOTPEmailAuth(otpString, state, challengeId, email);
 
             const data = await response.json();

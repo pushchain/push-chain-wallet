@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useReducer } from "react";
+import { WalletConfig } from "../types/wallet.types";
 
 // Define the shape of the app state
 export type AppState = {
@@ -9,6 +10,7 @@ export type AppState = {
     | "rejected"
     | "timeout",
   themeOverrides: Record<string, string>,
+  walletConfig: WalletConfig | null;
 };
 
 // Define actions for state management
@@ -18,12 +20,16 @@ export type AppAction = {
 } | {
   type: "SET_THEME_OVERRIDES";
   payload: Record<string, string>;
+} | {
+  type: "SET_WALLET_CONFIG";
+  payload: WalletConfig;
 };
 
 // Initial state
 const initialState: AppState = {
   externalWalletAuthState: "idle",
   themeOverrides: {},
+  walletConfig: null,
 };
 
 // Reducer function to manage state transitions
@@ -36,6 +42,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case "SET_THEME_OVERRIDES":
       return { ...state, themeOverrides: action.payload };
+    case "SET_WALLET_CONFIG":
+      return { ...state, walletConfig: action.payload };
     default:
       return state;
   }

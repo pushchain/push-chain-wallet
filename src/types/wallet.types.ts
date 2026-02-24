@@ -75,6 +75,13 @@ export const CONSTANTS = {
 export type LoginMethodConfig = {
   email: boolean;
   google: boolean;
+  phone?: boolean;
+  socials?: {
+    discord?: boolean;
+    github?: boolean;
+    x?: boolean;
+    bluesky?: boolean;
+  };
   wallet: {
     enabled: boolean;
     chains?: (typeof CONSTANTS.CHAIN)[keyof typeof CONSTANTS.CHAIN][];

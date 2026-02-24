@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { OTPReverification } from "./OTPReverification";
 import { Reauthentication } from "./Reauthentication";
 import { DrawerWrapper } from "../../../common/components";
-import { getAppParamValue } from "../../../common/Common.utils";
+import { getAppParamValue, isUIKitVersion } from "../../../common/Common.utils";
 import { useGlobalState } from "../../../context/GlobalContext";
-import { WALLET_TO_WALLET_ACTION } from "../../../common/Common.types";
 import { useEventEmitterContext } from "../../../context/EventEmitterContext";
+import { useState, useEffect } from "react";
+import { OTPReverification } from "./OTPReverification";
+import { WALLET_TO_WALLET_ACTION } from "../../../common/Common.types";
 
 export interface AuthParams {
     state: string;
@@ -23,6 +23,7 @@ const Reconnect = () => {
     const {state, dispatch} = useGlobalState();
 
     useEffect(() => {
+        if (isUIKitVersion("5")) return;
         const onMessage = (e: MessageEvent) => {
             if (e.origin !== window.location.origin) return;
 
@@ -44,18 +45,30 @@ const Reconnect = () => {
 
     return (
         <>
-            {state.reconnect && !showEmailLogin && (
-                <DrawerWrapper>
-                    <Reauthentication onCancel={() => handleCancelAppConnection()} />
-                </DrawerWrapper>
-            )}
-            {showEmailLogin && params && (
-                <DrawerWrapper>
-                    <OTPReverification
-                        params={params}
-                        onClose={() => setShowEmailLogin(false)} 
-                        onCancel={() => handleCancelAppConnection()}/>
-                </DrawerWrapper>
+            {(isUIKitVersion('5') || !isOpenedInIframe) ? (
+                <>
+                    {state.reconnect && (
+                        <DrawerWrapper>
+                            <Reauthentication onCancel={() => handleCancelAppConnection()} />
+                        </DrawerWrapper>
+                    )}
+                </>
+            ) : (
+                <>
+                    {state.reconnect && !showEmailLogin && (
+                        <DrawerWrapper>
+                            <Reauthentication onCancel={() => handleCancelAppConnection()} />
+                        </DrawerWrapper>
+                    )}
+                    {showEmailLogin && params && (
+                        <DrawerWrapper>
+                            <OTPReverification
+                                params={params}
+                                onClose={() => setShowEmailLogin(false)} 
+                                onCancel={() => handleCancelAppConnection()}/>
+                        </DrawerWrapper>
+                    )}
+                </>
             )}
         </>
     );

@@ -1,19 +1,28 @@
 import { FC } from "react";
-import { Box, Button, Front, Google, Text, TextInput } from "../../../blocks";
-import { getAppParamValue, getVersionParamValue, PoweredByPush } from "../../../common";
-import { SocialProvider, WalletState } from "../Authentication.types";
-import { useFormik } from "formik";
-import * as Yup from "yup";
+import { Box, Button, Text, TextInput, Front } from "../../../blocks";
+import { DrawerWrapper, getAppParamValue, LoadingContent, PoweredByPush, getVersionParamValue, isUIKitVersion } from "../../../common";
+import { WalletState, SocialProvider } from "../Authentication.types";
 import { APP_ROUTES } from "../../../constants";
 import { usePersistedQuery } from "../../../common/hooks/usePersistedQuery";
+import { WalletConfig } from "src/types/wallet.types";
+import styled from "styled-components";
+import { trimText } from "../../../helpers/AuthHelper";
+import { useWaapAuth } from "../../../waap/useWaapAuth";
+import { PushChain } from '@pushchain/core';
+import { useGlobalState } from "../../../context/GlobalContext";
+import {
+  waapSignMessage,
+  waapSignTypedData,
+  waapSignAndSendTransaction,
+} from '../../../waap/waapProvider';
+import { useNavigate } from "react-router-dom";
+import * as Yup from "yup";
+import { useFormik } from "formik";
 import {
   getAuthWindowConfig,
   getOTPEmailAuthRoute,
   getPushSocialAuthRoute,
 } from "../Authentication.utils";
-import { WalletConfig } from "src/types/wallet.types";
-import styled from "styled-components";
-import { trimText } from "../../../helpers/AuthHelper";
 
 export type LoginProps = {
   email: string;
@@ -28,6 +37,10 @@ const validationSchema = Yup.object().shape({
 
 const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig }) => {
   const persistQuery = usePersistedQuery();
+  const { loading, loginWithWaapSocial, tryAutoConnect, setLoading } = useWaapAuth();
+  const { state, dispatch } = useGlobalState();
+
+  const navigate = useNavigate();
 
   const isOpenedInIframe = !!getAppParamValue();
 
@@ -77,9 +90,66 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
     }
   };
 
+  const handleLogin = async (addr: `0x${string}`) => {
+    const w = await PushChain.utils.account.convertExecutorToOriginAccount(addr);
+
+    const instance = {
+      universalSigner: {
+        signMessage: waapSignMessage,
+        signTypedData: waapSignTypedData,
+        signAndSendTransaction: waapSignAndSendTransaction,
+        account: w.account
+      }
+    }
+
+    dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
+    dispatch({ type: "INITIALIZE_WALLET", payload: instance });
+
+    localStorage.setItem(
+      "walletInfo",
+      JSON.stringify(w.account)
+    );
+
+    navigate(`${persistQuery(APP_ROUTES.WALLET)}`, {
+      replace: true,
+    });
+  }
+
+  const handleWaapSocialLogin = async () => {
+    const result = await loginWithWaapSocial();
+    if (!result) return;
+
+    await handleLogin(result.address as `0x${string}`);
+
+    setLoading(false);
+  };
+
+  const handleReconnect = async () => {
+    if (state?.wallet) return;
+
+    const res = await tryAutoConnect();
+    if (!res?.address) return;
+
+    await handleLogin(res.address as `0x${string}`);
+  };
+
+  // useEffect(() => {
+  //   handleReconnect();
+  // }, []);
+
+  const hasBasic =
+    !!walletConfig?.loginDefaults?.email ||
+    !!walletConfig?.loginDefaults?.google ||
+    !!walletConfig?.loginDefaults?.phone;
+
+  const hasSocials =
+    !!walletConfig?.loginDefaults?.socials &&
+    Object.values(walletConfig?.loginDefaults?.socials).some(Boolean);
+
   const showEmailLogin = isOpenedInIframe ? walletConfig?.loginDefaults.email : true
   const showGoogleLogin = isOpenedInIframe ? walletConfig?.loginDefaults.google : true
   const showWalletLogin = isOpenedInIframe ? walletConfig?.loginDefaults.wallet.enabled : true
+  const showWaapLogin = isOpenedInIframe ? ( hasBasic || hasSocials ) : true
 
   return (
     <Box
@@ -149,80 +219,69 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
           width="100%"
           alignItems="center"
         >
-          {showEmailLogin && (
-            <>
-              <Box width="100%">
-                <form onSubmit={formik.handleSubmit}>
-                  <TextInput
-                    value={formik.values.email}
-                    onChange={formik.handleChange("email")}
-                    placeholder="Enter your email"
-                    error={formik.touched?.email && Boolean(formik.errors?.email)}
-                    errorMessage={formik.touched?.email ? formik.errors?.email : ""}
-                    trailingIcon={
-                      <Front
-                        size={24}
-                        onClick={() => {
-                          formik.handleSubmit();
-                          setConnectMethod("social");
-                        }}
-                      />
-                    }
-                  />
-                </form>
-              </Box>
-            </>
-          )}
+          {
+            (isUIKitVersion('5') || !isOpenedInIframe) ? (
+              <>
+                {showWaapLogin && (
+                  <Button
+                    variant="outline"
+                    block
+                    onClick={handleWaapSocialLogin}
+                  >
+                    Continue with Social login
+                  </Button>
+                )}
+                {(showWaapLogin && showWalletLogin) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+              </>
+            ) : (
+              <>
+                {showEmailLogin && (
+                  <>
+                    <Box width="100%">
+                      <form onSubmit={formik.handleSubmit}>
+                        <TextInput
+                          value={formik.values.email}
+                          onChange={formik.handleChange("email")}
+                          placeholder="Enter your email"
+                          error={formik.touched?.email && Boolean(formik.errors?.email)}
+                          errorMessage={formik.touched?.email ? formik.errors?.email : ""}
+                          trailingIcon={
+                            <Front
+                              size={24}
+                              onClick={() => {
+                                formik.handleSubmit();
+                                setConnectMethod("social");
+                              }}
+                            />
+                          }
+                        />
+                      </form>
+                    </Box>
+                  </>
+                )}
+                {showEmailLogin && showGoogleLogin && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+                {showGoogleLogin && (
+                  <>
+                    <Button
+                      variant="outline"
+                      block
+                      onClick={() => handleSocialLogin('google')}
+                    >
+                      Continue with Google
+                    </Button>
+                  </>
+                )}
 
-          {showEmailLogin && showGoogleLogin && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
-            OR
-          </Text>)}
-
-          {showGoogleLogin && (
-            <>
-              <Button
-                variant="outline"
-                block
-                leadingIcon={<Google width={24} height={24} />}
-                onClick={() => handleSocialLogin("google")}
-              >
-                Continue with Google
-              </Button>
-              {/* <Box
-            display="flex"
-            gap="spacing-xs"
-            alignItems="center"
-            justifyContent="center"
-          >
-            {socialLoginConfig.map((social) => (
-              <Button
-                key={social.name}
-                variant="outline"
-                iconOnly={social.icon}
-                css={css`
-                  width: 73px;
-                `}
-                onClick={() =>
-                  handleSocialLogin(
-                    social.name as
-                    | "github"
-                    | "google"
-                    | "discord"
-                    | "twitter"
-                    | "apple"
-                  )
-                }
-              />
-            ))}
-          </Box> */}
-
-            </>
-
-          )}
-
-          {((showGoogleLogin && showWalletLogin) || (showEmailLogin && showWalletLogin)) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
-            OR
-          </Text>)}
+                {((showGoogleLogin && showWalletLogin) || (showEmailLogin && showWalletLogin)) && (<Text variant="os-regular" color="pw-int-text-tertiary-color">
+                  OR
+                </Text>)}
+              </>
+            )
+          }
 
           {showWalletLogin && <Button
             variant="outline"
@@ -236,6 +295,12 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
         {/* <Text variant="bes-semibold" color="text-brand-medium">
           Recover using Secret Key{" "}
         </Text> */}
+        {(isUIKitVersion('5') || !isOpenedInIframe) && loading && (<DrawerWrapper>
+          <LoadingContent
+              title={"Verifying..."}
+              subTitle={"FInishing signing up in the new window to continue..."}
+          />
+        </DrawerWrapper>)}
       </Box>
       <PoweredByPush />
     </Box>
