@@ -90,6 +90,7 @@ const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
       >
         {showCloseButton && (
           <Box
+            display={{initial: 'block', mm: 'none'}}
             position="absolute"
             cursor="pointer"
             css={css`

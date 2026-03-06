@@ -11,6 +11,8 @@ import {
     Text,
     TickCircleFilled,
     Connector,
+    Cross,
+    deviceSizes,
 } from "blocks";
 import {
     centerMaskWalletAddress,
@@ -19,7 +21,9 @@ import {
     getAppParamValue,
     handleCopy,
     isUIKitVersion,
+    useDeviceWidthCheck,
     usePersistedQuery,
+    WALLET_TO_APP_ACTION,
 } from "common";
 import { useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "../../../../constants";
@@ -27,11 +31,11 @@ import { useEventEmitterContext } from "../../../../context/EventEmitterContext"
 import { useGlobalState } from "../../../../context/GlobalContext";
 import { useExternalWallet } from "../../../../context/ExternalWalletContext";
 import styled, { css } from "styled-components";
-import BlockiesSvg from "blockies-react-svg";
 import { FC, useState } from "react";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { convertCaipToObject } from "../../Wallet.utils";
 import { useWaapAuth } from "../../../../waap/useWaapAuth";
+import { Jazzicon } from "../../../../common/components/JazzIcon";
 
 type WalletHeaderProps = {
     walletAddress: string;
@@ -52,6 +56,8 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
 
     const showCloseButton = isUIKitVersion('1');
 
+    const isMobile = useDeviceWidthCheck(parseInt(deviceSizes.mobileM));
+
     const handleLogOut = () => {
         dispatch({ type: "RESET_WALLET" });
 
@@ -70,6 +76,13 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
         }
     };
 
+    const handleClose = () => {
+        window.parent.postMessage(
+            { type: WALLET_TO_APP_ACTION.CLOSE_IFRAME },
+            '*'
+        );
+    };
+
     const originAddress = state.externalWallet && state.externalWallet.originAddress ? convertCaipToObject(state.externalWallet.originAddress).result : null;
 
     return (
@@ -77,7 +90,7 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
             display="flex"
             justifyContent={activeState === "walletDashboard" ? "space-between" : "flex-start"}
             alignItems="flex-start"
-            width={showCloseButton ? "90%" : "100%"}
+            width={{initial: showCloseButton ? "90%" : "100%", mm: "100%"}}
             gap="spacing-xxs"
         >
             {handleBackButton && (
@@ -113,7 +126,7 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
                         overflow="hidden"
                         alignSelf="center"
                     >
-                        <BlockiesSvg address={walletAddress} />
+                        <Jazzicon address={walletAddress} size={44} />
                     </Box>
                 </Box>
 
@@ -154,6 +167,13 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
                                     handleLogOut();
                                 }}
                             />
+                            {isMobile && showCloseButton && (<MenuItem
+                                label="Minimize"
+                                icon={<Cross size={24} color="pw-int-icon-primary-color" />}
+                                onClick={() => {
+                                    handleClose();
+                                }}
+                            />)}
                         </Menu>
                     }
                 >
