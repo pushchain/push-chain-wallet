@@ -4,6 +4,7 @@ import React from "react";
 import { css } from "styled-components";
 import { useDarkMode } from "../hooks";
 import { isUIKitVersion, WALLET_TO_APP_ACTION } from "common";
+import { usePushChain } from "../../hooks/usePushChain";
 
 type BoxLayoutProps = {
   children: ReactNode;
@@ -11,6 +12,7 @@ type BoxLayoutProps = {
 
 const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
   const { isDarkMode } = useDarkMode();
+  const { executorAddress } = usePushChain();
 
   const showCloseButton = isUIKitVersion('1');
 
@@ -90,7 +92,7 @@ const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
       >
         {showCloseButton && (
           <Box
-            display={{initial: 'block', mm: 'none'}}
+            display={{initial: 'block', mm: executorAddress ? 'none' : 'block'}}
             position="absolute"
             cursor="pointer"
             css={css`
