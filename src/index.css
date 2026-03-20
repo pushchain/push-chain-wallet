@@ -14,9 +14,11 @@
   --w3o-font-family: unset !important;
   --onboard-modal-backdrop: transparent !important;
   --modal-backdrop: transparent !important;
+}
 
-  /* Wallet connect modal z-index */
-  --wcm-z-index: 99999 !important;
+/* Force WalletConnect modal above iframe */
+w3m-modal {
+  z-index: 1000000000 !important;
 }
 
 [theme="dark"] {

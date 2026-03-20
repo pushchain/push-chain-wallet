@@ -5,7 +5,7 @@ export type WaaPConfig = Parameters<typeof initWaaP>[0];
 
 type AuthMethod = "email" | "phone" | "social";
 
-const ReferralCode = "YCwMtN7ecmLCsAii";
+const referralCode = "YCwMtN7ecmLCsAii";
 
 const getAuthenticationMethods = (login: LoginMethodConfig): AuthMethod[] => {
   const methods: AuthMethod[] = [];
@@ -67,6 +67,6 @@ export const waapInitConfig = (isDarkMode: boolean, config: WalletConfig): WaaPC
       entryTitle: "Welcome to Push Wallet",
       emailLogoCid: 'bafkreifdpzwtpc234zuo66glbkecvdkqxhh3ujg6hqsm3fdtber6i4gsqq',
     },
-    referralCode: ReferralCode,
+    referralCode: referralCode,
   }
 };
