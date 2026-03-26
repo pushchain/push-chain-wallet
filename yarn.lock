@@ -2283,7 +2283,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@human.tech/waap-constants@npm:0.1.1":
+"@human.tech/waap-constants@npm:@human.tech/waap-constants@0.1.1":
   version: 0.1.1
   resolution: "@human.tech/waap-constants@npm:0.1.1"
   dependencies:
@@ -2292,7 +2292,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@human.tech/waap-interface-core@npm:0.2.1":
+"@human.tech/waap-interface-core@npm:@human.tech/waap-interface-core@0.2.1":
   version: 0.2.1
   resolution: "@human.tech/waap-interface-core@npm:0.2.1"
   dependencies:
@@ -2301,12 +2301,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@human.tech/waap-sdk@npm:^1.2.2":
-  version: 1.2.2
-  resolution: "@human.tech/waap-sdk@npm:1.2.2"
+"@human.tech/waap-sdk@npm:^1.2.3":
+  version: 1.2.3
+  resolution: "@human.tech/waap-sdk@npm:1.2.3"
   dependencies:
-    "@human.tech/waap-constants": "npm:0.1.1"
-    "@human.tech/waap-interface-core": "npm:0.2.1"
+    "@human.tech/waap-constants": "workspace:*"
+    "@human.tech/waap-interface-core": "workspace:*"
     "@metamask/rpc-errors": "npm:^5.1.1"
     "@mysten/sui": "npm:^1.45.2"
     "@mysten/wallet-standard": "npm:^0.13.0"
@@ -2322,7 +2322,7 @@ __metadata:
   peerDependenciesMeta:
     react:
       optional: true
-  checksum: 10/950627e7fa006a3d71b5fd31a6657a9b406c711d5916284179cb26285c6deb1692a5bb8f5ab252a840a765ea7484f68ac32cd556a08016826a86aa1ed5f1abc8
+  checksum: 10/1443f2bf30fbb5a671fd9d3bf646e5a7940aeef2f6ab57d5e679c3609abf07bb44b9701587b0f0e1157ce10615e8980e41ec907a414c332376cb92537a9b429f
   languageName: node
   linkType: hard
 
@@ -15094,7 +15094,7 @@ __metadata:
     "@fortawesome/fontawesome-svg-core": "npm:^6.7.0"
     "@fortawesome/free-brands-svg-icons": "npm:^6.6.0"
     "@fortawesome/react-fontawesome": "npm:^0.2.2"
-    "@human.tech/waap-sdk": "npm:^1.2.2"
+    "@human.tech/waap-sdk": "npm:^1.2.3"
     "@metamask/jazzicon": "npm:^2.0.0"
     "@metamask/sdk": "npm:^0.32.0"
     "@noble/hashes": "npm:^1.0.0"
