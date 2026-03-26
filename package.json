@@ -4,10 +4,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "resolutions": {
-    "@human.tech/waap-constants": "npm:@human.tech/waap-constants@0.1.1",
-    "@human.tech/waap-interface-core": "npm:@human.tech/waap-interface-core@0.2.1"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -37,7 +33,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.7.0",
     "@fortawesome/free-brands-svg-icons": "^6.6.0",
     "@fortawesome/react-fontawesome": "^0.2.2",
-    "@human.tech/waap-sdk": "^1.2.3",
+    "@human.tech/waap-sdk": "^1.2.4",
     "@metamask/jazzicon": "^2.0.0",
     "@metamask/sdk": "^0.32.0",
     "@noble/hashes": "^1.0.0",
