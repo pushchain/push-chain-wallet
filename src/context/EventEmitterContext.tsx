@@ -104,6 +104,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [walletRef.current]);
 
+  
   // useEffect(() => {
   //   const walletInfo = localStorage.getItem("walletInfo");
   //   const walletData = walletInfo ? JSON.parse(walletInfo) : null;
@@ -170,6 +171,15 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
           case APP_TO_WALLET_ACTION.RECONNECT_WALLET:
             handleIframeReconnectWallet();
             break;
+          case APP_TO_WALLET_ACTION.SHOW_UPGRADE_DRAWER:
+            dispatch?.({ 
+              type: "SHOW_UPGRADE_DRAWER", 
+              payload: { 
+                currentVersion: event.data.data.currentVersion, 
+                newVersion: event.data.data.newVersion, 
+              } 
+            });
+            break;
           default:
             console.warn("Unknown message type:", event.data);
         }
@@ -183,6 +193,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
+  
   const handleIframeReconnectWallet = () => {
     dispatch({ type: "SET_RECONNECT", payload: true });
   };

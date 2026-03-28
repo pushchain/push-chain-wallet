@@ -13,3 +13,4 @@ export * from "./PushWalletAppConnection";
 export * from "./TokenLogoComponent";
 export * from "./LoadingScreen";
 export * from "./NotFoundContent";
+export * from "./UpgradeDrawer";

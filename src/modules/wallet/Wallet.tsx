@@ -11,10 +11,12 @@ import { PushWallet } from "../../services/pushWallet/pushWallet";
 import { APP_ROUTES, ENV } from "../../constants";
 import secrets from "secrets.js-grempe";
 import { useGlobalState } from "../../context/GlobalContext";
+import { usePushChain } from "../../hooks/usePushChain";
 import { getWalletlist } from "./Wallet.utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePersistedQuery } from "../../common/hooks/usePersistedQuery";
 import { CreateNewWallet } from "../../common/components/CreateNewWallet";
+import { UpgradeDrawer } from "../../common/components/UpgradeDrawer";
 import WalletDashboard from "./components/dashboard/WalletDashboard";
 import AddTokens from "./components/AddTokens";
 import { Box, } from "blocks";
@@ -30,6 +32,7 @@ export type WalletProps = Record<string, never>;
 
 const Wallet: FC<WalletProps> = () => {
   const { state, dispatch } = useGlobalState();
+  const { pushChainClient } = usePushChain();
   const [createAccountLoading, setCreateAccountLoading] = useState(true);
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -323,6 +326,19 @@ const Wallet: FC<WalletProps> = () => {
             {activeState === 'send' && <Send />}
             {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
             <Reconnect />
+            {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (
+              <UpgradeDrawer
+                currentVersion={state.upgradeInfo.currentVersion}
+                newVersion={state.upgradeInfo.newVersion}
+                onUpgrade={async () => {
+                  await pushChainClient.upgradeAccount();
+                  dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                }}
+                onCancel={() => {
+                  dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                }}
+              />
+            )}
           </WalletDashboardProvider>
         </Box>
       </BoxLayout>

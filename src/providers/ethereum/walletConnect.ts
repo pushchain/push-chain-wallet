@@ -3,7 +3,7 @@ import { getAddress } from 'ethers';
 import { ChainType, ITypedData } from '../../types/wallet.types';
 import { BaseWalletProvider } from '../BaseWalletProvider';
 import * as chains from 'viem/chains';
-import { parseTransaction, toHex } from 'viem';
+import { hexToBytes, parseTransaction, toHex } from 'viem';
 
 export class WalletConnectProvider extends BaseWalletProvider {
     private provider: InstanceType<typeof EthereumProvider> | null = null;
@@ -216,29 +216,33 @@ export class WalletConnectProvider extends BaseWalletProvider {
     };
 
     signTypedData = async (typedData: ITypedData): Promise<Uint8Array> => {
-        try {
-            const provider = this.getProvider();
-            if (!provider) {
-                throw new Error('Provider is undefined');
-            }
-            const accounts = (await provider.request({
-                method: 'eth_accounts',
-            })) as string[];
-
-            if (!accounts || accounts.length === 0) {
-                throw new Error('No connected account');
-            }
-
-            const signature = await provider.request({
-                method: 'eth_signTypedData_v4',
-                params: [accounts[0], typedData],
-            });
-
-            return new Uint8Array(Buffer.from((signature as string).slice(2), 'hex'));
-        } catch (error) {
-            console.error('MetaMask signing error:', error);
-            throw error;
+        const provider = this.getProvider();
+    
+        const accounts = (await provider.request({
+          method: "eth_accounts",
+        })) as string[];
+    
+        if (!accounts || accounts.length === 0) {
+          throw new Error("No connected Rabby account");
         }
+    
+        typedData.types = {
+          EIP712Domain: [
+            { name: 'version', type: 'string' },
+            { name: 'chainId', type: 'uint256' },
+            { name: 'verifyingContract', type: 'address' },
+          ],
+          ...(typedData.primaryType === 'MigrationPayload'
+            ? { MigrationPayload: typedData.types['MigrationPayload'] }
+            : { UniversalPayload: typedData.types['UniversalPayload'] }),
+        };
+    
+        const signature = await provider.request({
+          method: "eth_signTypedData_v4",
+          params: [accounts[0], JSON.stringify(typedData)],
+        });
+    
+        return hexToBytes(signature as `0x${string}`);
     };
 
     disconnect = async () => {

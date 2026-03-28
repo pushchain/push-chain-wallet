@@ -201,11 +201,13 @@ export class RabbyProvider extends BaseWalletProvider {
 
     typedData.types = {
       EIP712Domain: [
-        { name: "version", type: "string" },
-        { name: "chainId", type: "uint256" },
-        { name: "verifyingContract", type: "address" },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
       ],
-      UniversalPayload: typedData.types["UniversalPayload"],
+      ...(typedData.primaryType === 'MigrationPayload'
+        ? { MigrationPayload: typedData.types['MigrationPayload'] }
+        : { UniversalPayload: typedData.types['UniversalPayload'] }),
     };
 
     const signature = await provider.request({

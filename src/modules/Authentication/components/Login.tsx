@@ -110,6 +110,7 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
       JSON.stringify(w.account)
     );
 
+    
     navigate(`${persistQuery(APP_ROUTES.WALLET)}`, {
       replace: true,
     });

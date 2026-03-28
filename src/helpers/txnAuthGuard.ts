@@ -2,6 +2,25 @@ import { PushChain } from "@pushchain/core";
 import { UniversalSigner } from "@pushchain/core/src/lib/universal/universal.types";
 import { ExternalWalletType } from "../types/wallet.types";
 
+export async function checkAndShowUpgradeIfNeeded(
+  pushChainClient: PushChain,
+  dispatch?: (action: any) => void,
+): Promise<boolean> {
+  await pushChainClient.accountStatusReady;
+  if (!pushChainClient.isReadMode && pushChainClient.accountStatus.uea.loaded && pushChainClient.accountStatus.uea.requiresUpgrade) {
+    dispatch?.({ 
+      type: "SHOW_UPGRADE_DRAWER", 
+      payload: { 
+        currentVersion: pushChainClient.accountStatus.uea.version, 
+        newVersion: pushChainClient.accountStatus.uea.minRequiredVersion, 
+      } 
+    });
+    return true;
+  }
+  
+  return false;
+}
+
 export function createGuardedPushChain(
   baseClient: PushChain,
 	handleReconnectExternalWallet: (walletData: ExternalWalletType) => Promise<void>,
@@ -9,6 +28,7 @@ export function createGuardedPushChain(
 	universalSigner: UniversalSigner,
 	intializeProps: any,
 	callback?: () => void,
+	dispatch?: (action: any) => void,
 ): PushChain {
   const clientRef: { current: PushChain } = { current: baseClient };
 
@@ -45,11 +65,19 @@ export function createGuardedPushChain(
     await promoting;
   };
 
-  const wrapWrite = <A extends unknown[], R>(
+  const checkUpgradeNeeded = async () => {
+		const upgradeNeeded = await checkAndShowUpgradeIfNeeded(clientRef.current, dispatch);
+		if (upgradeNeeded) {
+			throw new Error('Account upgrade required before performing write operations');
+		}
+	};
+
+	const wrapWrite = <A extends unknown[], R>(
     getter: () => (...args: A) => Promise<R>
 	) => {
 	const wrapped = async (...args: A): Promise<R> => {
 		await promoteIfNeeded();
+		await checkUpgradeNeeded();
 		const fn = getter();
 		return fn(...args);
 	};

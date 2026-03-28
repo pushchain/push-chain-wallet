@@ -76,7 +76,7 @@ const WalletDashboard: FC = () => {
                     />
                 </DrawerWrapper>
             )}
-        </>
+                    </>
     );
 };
 

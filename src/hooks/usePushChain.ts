@@ -4,8 +4,9 @@ import { useExternalWallet } from '../context/ExternalWalletContext';
 import { useGlobalState } from '../context/GlobalContext';
 import { PUSH_NETWORK } from '@pushchain/core/src/lib/constants/enums';
 import { getWalletlist } from '../modules/wallet/Wallet.utils';
-import { createGuardedPushChain } from '../helpers/txnAuthGuard';
+import { createGuardedPushChain, checkAndShowUpgradeIfNeeded } from '../helpers/txnAuthGuard';
 import { useEventEmitterContext } from '../context/EventEmitterContext';
+import { getAppParamValue } from '../common';
 
 export const usePushChain = () => {
     const { dispatch, state } = useGlobalState();
@@ -15,6 +16,8 @@ export const usePushChain = () => {
     const [executorAddress, setExecutorAddress] = useState(null);
 
     const { handleReconnectWallet, handleReconnectExternalWallet } = useEventEmitterContext();
+
+    const isOpenedInIframe = !!getAppParamValue();
     
     // getting push wallet (if created by social login)
     const pushWallet = getWalletlist(state.wallet)[0];
@@ -34,6 +37,7 @@ export const usePushChain = () => {
         const initializePushChain = async () => {
             if (!parsedWallet) {
                 setPushChain(null);
+                dispatch({ type: "SET_UPGRADE_CHECKED", payload: false });
                 return;
             }
 
@@ -53,9 +57,9 @@ export const usePushChain = () => {
                 const signerSkeleton = PushChain.utils.signer.construct(
                     universalAccount,
                     {
-                        signMessage: state.wallet ? state.wallet.signMessage : signMessageRequest,
-                        signAndSendTransaction: state.wallet ? state.wallet.signAndSendTransaction : signTransactionRequest,
-                        signTypedData: isSolana ? undefined : state.wallet ? state.wallet.signTypedData : signTypedDataRequest,
+                        signMessage: state.wallet ? state.wallet.universalSigner.signMessage : signMessageRequest,
+                        signAndSendTransaction: state.wallet ? state.wallet.universalSigner.signAndSendTransaction : signTransactionRequest,
+                        signTypedData: isSolana ? undefined : state.wallet ? state.wallet.universalSigner.signTypedData : signTypedDataRequest,
                     }
                 );
 
@@ -73,27 +77,33 @@ export const usePushChain = () => {
                 let pushChainClient: PushChain;
 
                 if (state.isReadOnly) {
-                    const client = await PushChain.initialize(universalAccount, {
+                    pushChainClient = await PushChain.initialize(universalAccount, {
                         network: PUSH_NETWORK.TESTNET_DONUT,
                     });
-                    pushChainClient = createGuardedPushChain(
-                        client,
-                        handleReconnectExternalWallet,
-                        handleReconnectWallet,
-                        universalSigner,
-                        intializeProps,
-                        () => {
-                            dispatch({ type: "SET_READ_ONLY", payload: false });
-                        },
-                    )
                 } else {
                     pushChainClient = await PushChain.initialize(universalSigner, intializeProps);
-                    
                 }
 
-                setPushChain(pushChainClient);
-                const executorAddress = pushChainClient.universal.account;
+                const guardedPushChainClient = createGuardedPushChain(
+                    pushChainClient,
+                    handleReconnectExternalWallet,
+                    handleReconnectWallet,
+                    universalSigner,
+                    intializeProps,
+                    () => {
+                        dispatch({ type: "SET_READ_ONLY", payload: false });
+                    },
+                    dispatch,
+                );
+
+                setPushChain(guardedPushChainClient);
+                const executorAddress = guardedPushChainClient.universal.account;
                 setExecutorAddress(executorAddress);
+
+                if (!state.upgradeChecked && !isOpenedInIframe) {
+                    await checkAndShowUpgradeIfNeeded(guardedPushChainClient, dispatch);
+                    dispatch({ type: "SET_UPGRADE_CHECKED", payload: true });
+                }
 
             } catch (err) {
                 console.log('Error occured when initialising Push chain', err);
@@ -107,7 +117,7 @@ export const usePushChain = () => {
         };
 
         initializePushChain();
-    }, [parsedWallet]);
+    }, [parsedWallet, state.upgradeChecked]);
 
     return {
         executorAddress: executorAddress,

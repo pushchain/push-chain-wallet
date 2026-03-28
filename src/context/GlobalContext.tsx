@@ -49,6 +49,12 @@ export type GlobalState = {
   | "not_installed";
   isReadOnly: boolean;
   reconnect: boolean;
+  showUpgradeDrawer: boolean;
+  upgradeInfo: {
+    currentVersion: string;
+    newVersion: string;
+  } | null;
+  upgradeChecked: boolean;
 };
 
 // Define actions for state management
@@ -71,7 +77,10 @@ export type GlobalAction =
     payload: GlobalState["externalWalletAppConnectionStatus"];
   }
   | { type: "SET_READ_ONLY"; payload: boolean }
-  | { type: "SET_RECONNECT"; payload: boolean };
+  | { type: "SET_RECONNECT"; payload: boolean }
+  | { type: "SHOW_UPGRADE_DRAWER"; payload: { currentVersion: string; newVersion: string } }
+  | { type: "HIDE_UPGRADE_DRAWER" }
+  | { type: "SET_UPGRADE_CHECKED"; payload: boolean };
 
 // Initial state
 const initialState: GlobalState = {
@@ -90,6 +99,9 @@ const initialState: GlobalState = {
   externalWalletAuthState: "idle",
   isReadOnly: false,
   reconnect: false,
+  showUpgradeDrawer: false,
+  upgradeInfo: null,
+  upgradeChecked: false,
 };
 
 // Reducer function to manage state transitions
@@ -155,6 +167,23 @@ function globalReducer(state: GlobalState, action: GlobalAction): GlobalState {
       return {
         ...state,
         reconnect: action.payload,
+      };
+    case "SHOW_UPGRADE_DRAWER":
+      return {
+        ...state,
+        showUpgradeDrawer: true,
+        upgradeInfo: action.payload,
+      };
+    case "HIDE_UPGRADE_DRAWER":
+      return {
+        ...state,
+        showUpgradeDrawer: false,
+        upgradeInfo: null,
+      };
+    case "SET_UPGRADE_CHECKED":
+      return {
+        ...state,
+        upgradeChecked: action.payload,
       };
     default:
       return state;

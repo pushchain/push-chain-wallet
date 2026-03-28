@@ -28,6 +28,10 @@ export enum WALLET_TO_APP_ACTION {
   PUSH_SEND_TRANSACTION = 'pushSendTransaction',
 
   CLOSE_IFRAME = 'closeIFrame',
+
+  UPGRADE_ACCOUNT_REQUEST = 'upgradeAccountRequest',
+  UPGRADE_ACCOUNT_SUCCESS = 'upgradeAccountSuccess',
+  UPGRADE_ACCOUNT_ERROR = 'upgradeAccountError',
 }
 
 export enum APP_TO_WALLET_ACTION {
@@ -43,6 +47,9 @@ export enum APP_TO_WALLET_ACTION {
   PUSH_SEND_TRANSACTION_RESPONSE = 'pushSendTransactionResponse',
   READ_ONLY_CONNECTION_STATUS = 'readOnlyConnectionStatus',
   RECONNECT_WALLET = 'ReconnectWallet',
+
+  SHOW_UPGRADE_DRAWER = 'showUpgradeDrawer',
+  UPGRADE_ACCOUNT_RESPONSE = 'upgradeAccountResponse',
 }
 
 export enum WALLET_TO_WALLET_ACTION {
