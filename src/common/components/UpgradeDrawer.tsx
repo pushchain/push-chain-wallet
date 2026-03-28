@@ -118,7 +118,7 @@ const UpgradeDrawer: FC<UpgradeDrawerProps> = ({
           </Text>
           <Box display="flex" flexDirection="column" gap="spacing-xxs" padding="spacing-xxs spacing-none">
             <Text variant="bs-regular" color="pw-int-text-secondary-color">
-              Your account requires upgrade from {currentVersion} to {newVersion}. 
+              Your account requires upgrade from v{currentVersion} to v{newVersion}. 
               This is a gasless operation and doesn't affect your funds.
             </Text>
             <Text variant="bs-regular" color="pw-int-text-tertiary-color">
