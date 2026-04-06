@@ -6,6 +6,7 @@ import { blocksTheme, getBlocksCSSVariables } from "./blocks";
 import { getAppBasePath } from "../basePath";
 import { useDarkMode, RouterContainer, isUIKitVersion, getAppParamValue } from "./common";
 import { EventEmitterProvider } from "./context/EventEmitterContext";
+import { PushChainProvider } from "./context/PushChainContext";
 import { ExternalWalletContextProvider } from "./context/ExternalWalletContext";
 import { useAppState } from "./context/AppContext";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -55,7 +56,9 @@ export default function App() {
           <ExternalWalletContextProvider>
             <GlobalProvider>
               <EventEmitterProvider>
-                <RouterContainer />
+                <PushChainProvider>
+                  <RouterContainer />
+                </PushChainProvider>
               </EventEmitterProvider>
             </GlobalProvider>
           </ExternalWalletContextProvider>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchUserBalance } from '../helpers/WalletHelper';
 
 export const useWalletOperations = (address: string) => {
-    const pollMs = 10_000;
+    const pollMs = 15_000;
 
     return useQuery({
         queryKey: ['userBalance', address],

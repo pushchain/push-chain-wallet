@@ -5,7 +5,7 @@ import { ActiveStates, TokenFormat } from '../../../types';
 import { useTokenManager } from '../../../hooks/useTokenManager';
 import OriginChainTokenList from './OriginChainTokenList';
 import { useGlobalState } from '../../../context/GlobalContext';
-import { usePushChain } from '../../../hooks/usePushChain';
+import { usePushChain } from '../../../context/PushChainContext';
 import { convertCaipToObject, getWalletlist } from '../Wallet.utils';
 import { css } from 'styled-components';
 import { PushChain } from '@pushchain/core';

@@ -16,7 +16,7 @@ import WalletHeader from "./dashboard/WalletHeader";
 import { useWalletDashboard } from "../../../context/WalletDashboardContext";
 import { useTokenManager } from "../../../hooks/useTokenManager";
 import { TokenFormat } from "../../../types";
-import { usePushChain } from "../../../hooks/usePushChain";
+import { usePushChain } from "../../../context/PushChainContext";
 import { TokensListItem } from "./TokensListItem";
 import { truncateWords } from "common";
 import { isAddress } from "viem";

@@ -23,6 +23,7 @@ import {
   getOTPEmailAuthRoute,
   getPushSocialAuthRoute,
 } from "../Authentication.utils";
+import { useEventEmitterContext } from "../../../context/EventEmitterContext";
 
 export type LoginProps = {
   email: string;
@@ -37,8 +38,9 @@ const validationSchema = Yup.object().shape({
 
 const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig }) => {
   const persistQuery = usePersistedQuery();
-  const { loading, loginWithWaapSocial, tryAutoConnect, setLoading } = useWaapAuth();
+  const { loginWithWaapSocial, tryAutoConnect } = useWaapAuth();
   const { state, dispatch } = useGlobalState();
+  const { socialConnectionLoading, setSocialConnectionLoading } = useEventEmitterContext();
 
   const navigate = useNavigate();
 
@@ -118,7 +120,7 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
 
   const handleWaapSocialLogin = async () => {
     if (isUIKitVersion('6') && isOpenedInIframe) {
-      setLoading(true);
+      setSocialConnectionLoading(true);
       window.parent?.postMessage(
         {
           type: WALLET_TO_APP_ACTION.CONNECT_SOCIAL,
@@ -132,7 +134,7 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
 
     await handleLogin(result.address as `0x${string}`);
 
-    setLoading(false);
+    setSocialConnectionLoading(false);
   };
 
   const handleReconnect = async () => {
@@ -306,7 +308,7 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
         {/* <Text variant="bes-semibold" color="text-brand-medium">
           Recover using Secret Key{" "}
         </Text> */}
-        {(isUIKitVersion('5') || !isOpenedInIframe) && loading && (<DrawerWrapper>
+        {(isUIKitVersion('5') || !isOpenedInIframe) && socialConnectionLoading && (<DrawerWrapper>
           <LoadingContent
               title={"Verifying..."}
               subTitle={"FInishing signing up in the new window to continue..."}

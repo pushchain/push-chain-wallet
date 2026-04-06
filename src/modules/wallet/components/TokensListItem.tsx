@@ -3,7 +3,7 @@ import { Box, Text } from "blocks";
 import { TokenFormat } from "../../../types";
 import { TokenLogoComponent } from "common";
 import { useTokenBalance } from "../../../hooks/useTokenBalance";
-import { usePushChain } from "../../../hooks/usePushChain";
+import { usePushChain } from "../../../context/PushChainContext";
 import { formatTokenValue } from "../Wallet.utils";
 
 type TokenListItemProps = {

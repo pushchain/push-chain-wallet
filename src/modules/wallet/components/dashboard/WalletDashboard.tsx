@@ -7,7 +7,7 @@ import { getWalletlist } from '../../Wallet.utils';
 import { ConnectionSuccess } from '../../../../common/components/ConnectionSuccess';
 import { useGlobalState } from '../../../../context/GlobalContext';
 import { useWalletDashboard } from '../../../../context/WalletDashboardContext';
-import { usePushChain } from '../../../../hooks/usePushChain';
+import { usePushChain } from '../../../../context/PushChainContext';
 
 const WalletDashboard: FC = () => {
     const { state, dispatch } = useGlobalState();

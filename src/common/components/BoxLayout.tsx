@@ -4,7 +4,7 @@ import React from "react";
 import { css } from "styled-components";
 import { useDarkMode } from "../hooks";
 import { isUIKitVersion, WALLET_TO_APP_ACTION } from "common";
-import { usePushChain } from "../../hooks/usePushChain";
+import { usePushChain } from "../../context/PushChainContext";
 
 type BoxLayoutProps = {
   children: ReactNode;

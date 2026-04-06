@@ -45,6 +45,8 @@ export type EventEmitterState = {
   handleReconnectWallet: () => void;
   handleReconnectExternalWallet: (walletData: ExternalWalletType) => Promise<void>;
   handleCancelAppConnection: () => void;
+  socialConnectionLoading: boolean;
+  setSocialConnectionLoading: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 // Create context
@@ -61,6 +63,8 @@ const WalletContext = createContext<EventEmitterState>({
   handleReconnectWallet: () => { },
   handleReconnectExternalWallet: async () => { },
   handleCancelAppConnection: () => { },
+  socialConnectionLoading: false,
+  setSocialConnectionLoading: () => { },
 });
 
 // Custom hook to use the WalletContext
@@ -82,6 +86,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const [isLoggedEmitterCalled, setLoginEmitterStatus] = useState(false);
   const [txhash, setTxhash] = useState<string | null>(null);
+  const [socialConnectionLoading, setSocialConnectionLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -89,7 +94,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const { connect, setExternalWallet } = useExternalWallet();
 
-  const { logoutWaap, setLoading } = useWaapAuth();
+  const { logoutWaap } = useWaapAuth();
 
   const isOpenedInIframe = !!getAppParamValue();
 
@@ -427,9 +432,15 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const handleSocialConnection = (data: {
-    account: UniversalAccount
+    account?: UniversalAccount,
+    error?: boolean,
   }) => {
-    setLoading(false);
+    setSocialConnectionLoading(false);
+
+    if (data.error) {
+      dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "rejected" });
+      return;
+    }
 
     const instance = {
       universalSigner: {
@@ -707,7 +718,9 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
         setTxhash,
         handleReconnectWallet,
         handleReconnectExternalWallet,
-        handleCancelAppConnection
+        handleCancelAppConnection,
+        socialConnectionLoading,
+        setSocialConnectionLoading,
       }}
     >
       {children}

@@ -4,7 +4,7 @@ import WalletHeader from './dashboard/WalletHeader';
 import styled, { css } from 'styled-components';
 import { useWalletDashboard } from '../../../context/WalletDashboardContext';
 import { QRCodeSVG } from 'qrcode.react';
-import { usePushChain } from '../../../hooks/usePushChain';
+import { usePushChain } from '../../../context/PushChainContext';
 
 const Receive = () => {
     const { setActiveState } = useWalletDashboard();

@@ -11,7 +11,7 @@ import { PushWallet } from "../../services/pushWallet/pushWallet";
 import { APP_ROUTES, ENV } from "../../constants";
 import secrets from "secrets.js-grempe";
 import { useGlobalState } from "../../context/GlobalContext";
-import { usePushChain } from "../../hooks/usePushChain";
+import { usePushChain } from "../../context/PushChainContext";
 import { getWalletlist } from "./Wallet.utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePersistedQuery } from "../../common/hooks/usePersistedQuery";

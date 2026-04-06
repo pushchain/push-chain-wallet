@@ -4,7 +4,7 @@ import { TokenFormat } from '../types';
 import { isAddress } from 'viem';
 import { viemClient } from '../utils/viemClient';
 import { PushChain } from '@pushchain/core';
-import { usePushChain } from './usePushChain';
+import { usePushChain } from '../context/PushChainContext';
 import { Contract, JsonRpcProvider } from 'ethers';
 import { getPrc20Address } from '../utils/prc20TokenDetails';
 

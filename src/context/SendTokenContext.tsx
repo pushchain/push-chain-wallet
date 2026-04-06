@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { SendTokenState, TokenFormat } from "../types";
 import { encodeFunctionData, erc20Abi, parseUnits } from "viem";
-import { usePushChain } from "../hooks/usePushChain";
+import { usePushChain } from "../context/PushChainContext";
 import { getAppParamValue, WALLET_TO_APP_ACTION } from "common";
 import { useEventEmitterContext } from "./EventEmitterContext";
 import { ExecuteParams } from "@pushchain/core/src/lib/orchestrator/orchestrator.types";
