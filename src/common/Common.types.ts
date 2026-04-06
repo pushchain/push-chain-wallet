@@ -24,6 +24,7 @@ export enum WALLET_TO_APP_ACTION {
   ERROR = "error",
 
   CONNECT_WALLET = "connectWallet",
+  CONNECT_SOCIAL = "connectSocial",
 
   PUSH_SEND_TRANSACTION = 'pushSendTransaction',
 
@@ -39,9 +40,11 @@ export enum APP_TO_WALLET_ACTION {
   SIGN_MESSAGE = 'signMessage',
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_TYPED_DATA = 'signTypedData',
+  ERROR = "error",
   LOG_OUT = "logOut",
 
   CONNECTION_STATUS = "connectionStatus",
+  SOCIAL_CONNECTION_STATUS = "socialConnectionStatus",
   WALLET_CONFIG = "walletConfig",
 
   PUSH_SEND_TRANSACTION_RESPONSE = 'pushSendTransactionResponse',

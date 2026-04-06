@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { Box, Button, Text, TextInput, Front } from "../../../blocks";
-import { DrawerWrapper, getAppParamValue, LoadingContent, PoweredByPush, getVersionParamValue, isUIKitVersion } from "../../../common";
+import { DrawerWrapper, getAppParamValue, LoadingContent, PoweredByPush, getVersionParamValue, isUIKitVersion, WALLET_TO_APP_ACTION } from "../../../common";
 import { WalletState, SocialProvider } from "../Authentication.types";
 import { APP_ROUTES } from "../../../constants";
 import { usePersistedQuery } from "../../../common/hooks/usePersistedQuery";
@@ -117,6 +117,16 @@ const Login: FC<LoginProps> = ({ email, setEmail, setConnectMethod, walletConfig
   }
 
   const handleWaapSocialLogin = async () => {
+    if (isUIKitVersion('6') && isOpenedInIframe) {
+      setLoading(true);
+      window.parent?.postMessage(
+        {
+          type: WALLET_TO_APP_ACTION.CONNECT_SOCIAL,
+        },
+        getAppParamValue()
+      );
+      return;
+    }
     const result = await loginWithWaapSocial();
     if (!result) return;
 

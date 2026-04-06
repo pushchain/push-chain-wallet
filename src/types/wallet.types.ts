@@ -129,3 +129,8 @@ export interface EthereumTransactionReceipt {
   transactionIndex: string;
   type: string;
 }
+
+export type WalletEventRespoonse = {
+  signature?: Uint8Array;
+  account?: UniversalAccount;
+};

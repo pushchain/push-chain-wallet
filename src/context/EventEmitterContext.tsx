@@ -12,24 +12,24 @@ import {
   acceptPushWalletConnectionRequest,
   WALLET_TO_WALLET_ACTION,
   APP_TO_WALLET_ACTION,
-  getAllAppConnections,
   getAppParamValue,
   rejectAllPushWalletConnectionRequests,
   rejectPushWalletConnectionRequest,
   usePersistedQuery,
   WALLET_TO_APP_ACTION,
   useDarkMode,
+  isUIKitVersion,
 } from "../common";
 import { requestToConnectPushWallet } from "../common";
 import { APP_ROUTES } from "../constants";
-import { AppMetadata, ChainType, CONSTANTS, ExternalWalletType, IWalletProvider, LoginMethodConfig, UniversalAccount, WalletConfig } from "../types/wallet.types";
+import { AppMetadata, ChainType, CONSTANTS, ExternalWalletType, ITypedData, IWalletProvider, LoginMethodConfig, UniversalAccount, WalletConfig, WalletEventRespoonse } from "../types/wallet.types";
 import { useAppState } from "./AppContext";
-import { TypedData, TypedDataDomain } from "viem";
 import { getOTPEmailAuthRoute, getPushSocialAuthRoute } from "../modules/Authentication/Authentication.utils";
 import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
 import { useExternalWallet } from "./ExternalWalletContext";
 import { walletRegistry } from "../providers/WalletProviderRegistry";
 import { useWaapAuth } from "../waap/useWaapAuth";
+import { TypedData, TypedDataDomain } from "viem";
 
 // Define the shape of the app state
 export type EventEmitterState = {
@@ -89,13 +89,20 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const { connect, setExternalWallet } = useExternalWallet();
 
-  const { logoutWaap } = useWaapAuth();
+  const { logoutWaap, setLoading } = useWaapAuth();
+
+  const isOpenedInIframe = !!getAppParamValue();
 
   // TODO: Right now we check the logged in wallet type. But we need to support the functionality of selected wallet type of the app.
 
   // For social login and email
   const walletRef = useRef(state.wallet);
   walletRef.current = state.wallet;
+
+  const signatureResolverRef = useRef<{
+    success?: (data: WalletEventRespoonse) => void;
+    error?: (data: WalletEventRespoonse) => void;
+  } | null>(null);
 
   useEffect(() => {
     if (walletRef.current && !isLoggedEmitterCalled) {
@@ -143,19 +150,43 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
             handleWalletConfigs(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.SIGN_MESSAGE:
-            handleSignAndSendMessage(event.data.data);
+            if (isUIKitVersion('6')) {
+              if (signatureResolverRef.current) {
+                signatureResolverRef?.current?.success?.(event.data.data);
+              }
+            } else {
+              handleSignAndSendMessage(event.data.data);
+            }
             break;
           case APP_TO_WALLET_ACTION.SIGN_TRANSACTION:
-            handleSignAndSendTransaction(event.data.data);
+            if (isUIKitVersion('6')) {
+              if (signatureResolverRef.current) {
+                signatureResolverRef?.current?.success?.(event.data.data);
+              }
+            } else {
+              handleSignAndSendTransaction(event.data.data);
+            }
             break;
           case APP_TO_WALLET_ACTION.SIGN_TYPED_DATA:
-            handleSignTypedData(event.data.data);
+            if (isUIKitVersion('6')) {
+              if (signatureResolverRef.current) {
+                signatureResolverRef?.current?.success?.(event.data.data);
+              }
+            } else {
+              handleSignTypedData(event.data.data);
+            }
+            break;
+          case APP_TO_WALLET_ACTION.ERROR:
+            signatureResolverRef?.current?.error?.(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.LOG_OUT:
             handleLogOutEvent();
             break;
           case APP_TO_WALLET_ACTION.CONNECTION_STATUS:
             handleExternalWalletConnection(event.data.data);
+            break;
+          case APP_TO_WALLET_ACTION.SOCIAL_CONNECTION_STATUS:
+            handleSocialConnection(event.data.data);
             break;
           case APP_TO_WALLET_ACTION.READ_ONLY_CONNECTION_STATUS:
             handleReadOnlyWalletConnection(event.data.data);
@@ -393,6 +424,131 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
         },
       });
     }
+  };
+
+  const handleSocialConnection = (data: {
+    account: UniversalAccount
+  }) => {
+    setLoading(false);
+
+    const instance = {
+      universalSigner: {
+        signMessage: handleSendSignRequestToPushWallet,
+        signTypedData: handleSendSignTypedDataRequestToPushWallet,
+        signAndSendTransaction: handleSendSignTransactionRequestToPushWallet,
+        account: data.account
+      }
+    }
+
+    dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
+    dispatch({ type: "INITIALIZE_WALLET", payload: instance });
+
+    localStorage.setItem(
+      "walletInfo",
+      JSON.stringify(data.account)
+    );
+
+    
+    navigate(`${persistQuery(APP_ROUTES.WALLET)}`, {
+      replace: true,
+    });
+  };
+
+  // handles Push wallet signature request
+  const handleSendSignRequestToPushWallet = (
+    data: Uint8Array
+  ): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      if (signatureResolverRef.current) {
+        reject(new Error('Another sign request is already in progress'));
+        return;
+      }
+
+      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+
+      signatureResolverRef.current = {
+        success: (response: WalletEventRespoonse) => {
+          resolve(response.signature!);
+          signatureResolverRef.current = null;
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
+        },
+        error: () => {
+          signatureResolverRef.current = null; // Clean up
+          reject(new Error('Signature request failed'));
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
+        },
+      };
+
+      // Send the sign request to the wallet tab
+      sendMessageToMainTab({
+        type: APP_TO_WALLET_ACTION.SIGN_MESSAGE,
+        data,
+      });
+    });
+  };
+
+  const handleSendSignTransactionRequestToPushWallet = (
+    data: Uint8Array
+  ): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      if (signatureResolverRef.current) {
+        reject(new Error('Another sign request is already in progress'));
+        return;
+      }
+
+      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+
+      signatureResolverRef.current = {
+        success: (response: WalletEventRespoonse) => {
+          resolve(response.signature!);
+          signatureResolverRef.current = null;
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
+        },
+        error: () => {
+          signatureResolverRef.current = null; // Clean up
+          reject(new Error('Signature request failed'));
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
+        },
+      };
+
+      // Send the sign request to the wallet tab
+      sendMessageToMainTab({
+        type: APP_TO_WALLET_ACTION.SIGN_TRANSACTION,
+        data,
+      });
+    });
+  };
+
+  const handleSendSignTypedDataRequestToPushWallet = (
+    data: ITypedData
+  ): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      if (signatureResolverRef.current) {
+        reject(new Error('Another sign request is already in progress'));
+        return;
+      }
+
+      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+
+      signatureResolverRef.current = {
+        success: (response: WalletEventRespoonse) => {
+          resolve(response.signature!);
+          signatureResolverRef.current = null;
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
+        },
+        error: () => {
+          signatureResolverRef.current = null; // Clean up
+          reject(new Error('Signature request failed'));
+          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
+        },
+      };
+
+      // Send the sign request to the wallet tab
+      sendMessageToMainTab({
+        type: APP_TO_WALLET_ACTION.SIGN_TYPED_DATA,
+        data,
+      });
+    });
   };
 
   const handleNewConnectionRequest = (origin: string) => {

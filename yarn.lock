@@ -2290,30 +2290,30 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@human.tech/waap-constants@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@human.tech/waap-constants@npm:0.1.1"
+"@human.tech/waap-constants@npm:0.1.2":
+  version: 0.1.2
+  resolution: "@human.tech/waap-constants@npm:0.1.2"
   dependencies:
-    "@human.tech/waap-interface-core": "npm:0.2.1"
-  checksum: 10/3191b3c3f68aa21597a57c5f3bd767cdabf25f3c754a2ed982932b835069d759f36048c020d461e4cd8ece657d8995a56c2d2c3b720a86305a3127adce8a470d
+    "@human.tech/waap-interface-core": "npm:0.3.0"
+  checksum: 10/6b6c15c833f31222fe28118d1cd09b79b54f9529717d30ddcd8bf3b3d8e039d30aacdd62e70e8484ec4b7fa48a7b0ecb3a4a790810bee1db968653227f8202ca
   languageName: node
   linkType: hard
 
-"@human.tech/waap-interface-core@npm:0.2.1, @human.tech/waap-interface-core@npm:^0.2.1":
-  version: 0.2.1
-  resolution: "@human.tech/waap-interface-core@npm:0.2.1"
+"@human.tech/waap-interface-core@npm:0.3.0":
+  version: 0.3.0
+  resolution: "@human.tech/waap-interface-core@npm:0.3.0"
   dependencies:
     crypto-js: "npm:^4.2.0"
-  checksum: 10/45e0589a31ef876e3e71115223f8949cc5fdb37bf65b766745e6ca22d7841f3244d6f54f64287ac45de44d10d95ae48140b078e1e3f9f1d53315c01315116c6b
+  checksum: 10/a11e84a8982875d97d8008ab69ff93cdd19a19f7736e3de48c4a78596c44a7ed83c63f8f8a2f5c06b4aa96a19f4b33dc51918301496cbb8597ad554330ffc862
   languageName: node
   linkType: hard
 
-"@human.tech/waap-sdk@npm:^1.2.4":
-  version: 1.2.4
-  resolution: "@human.tech/waap-sdk@npm:1.2.4"
+"@human.tech/waap-sdk@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@human.tech/waap-sdk@npm:1.3.0"
   dependencies:
-    "@human.tech/waap-constants": "npm:^0.1.1"
-    "@human.tech/waap-interface-core": "npm:^0.2.1"
+    "@human.tech/waap-constants": "npm:0.1.2"
+    "@human.tech/waap-interface-core": "npm:0.3.0"
     "@metamask/rpc-errors": "npm:^5.1.1"
     "@mysten/sui": "npm:^1.45.2"
     "@mysten/wallet-standard": "npm:^0.13.0"
@@ -2329,7 +2329,7 @@ __metadata:
   peerDependenciesMeta:
     react:
       optional: true
-  checksum: 10/96ff55625c5804c6ca77ff231dd27551a18796c327ca231e273f58751f3a155382c17f2f24374c910841b7750b67f874d10172aa6108958c9c39cf326aa2bec1
+  checksum: 10/efdfc37a9ae0906ba4e3702a4128815c528d3e575cc94764289e4ae58eb04f21550055811ec0f958fe384b4f45e3851548900627a3101ac13be39fbc8cdc37c1
   languageName: node
   linkType: hard
 
@@ -15183,7 +15183,7 @@ __metadata:
     "@fortawesome/fontawesome-svg-core": "npm:^6.7.0"
     "@fortawesome/free-brands-svg-icons": "npm:^6.6.0"
     "@fortawesome/react-fontawesome": "npm:^0.2.2"
-    "@human.tech/waap-sdk": "npm:^1.2.4"
+    "@human.tech/waap-sdk": "npm:^1.3.0"
     "@metamask/jazzicon": "npm:^2.0.0"
     "@metamask/sdk": "npm:^0.32.0"
     "@noble/hashes": "npm:^1.0.0"
