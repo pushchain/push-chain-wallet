@@ -3604,9 +3604,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pushchain/core@npm:^5.1.4-alpha.3":
-  version: 5.1.4-alpha.3
-  resolution: "@pushchain/core@npm:5.1.4-alpha.3"
+"@pushchain/core@npm:^5.1.4-alpha.4":
+  version: 5.1.4-alpha.4
+  resolution: "@pushchain/core@npm:5.1.4-alpha.4"
   dependencies:
     "@bufbuild/protobuf": "npm:^2.0.0"
     "@cosmjs/crypto": "npm:0.33.1"
@@ -3631,7 +3631,7 @@ __metadata:
       optional: true
     tweetnacl:
       optional: true
-  checksum: 10/ce8d122af98a60c849481b2004492d94ecb7808130e9317b19b6fb28c2101f3a82e942142e01b741a5a2858b44bd8caa60b15c2ab8badb28d7465e5dccb9115f
+  checksum: 10/58ae05d02effe42bd7d396110a46744976711cc814f94e9ef6e670d506bad41e70dadac2df307d4f3281dd7dc432859492270fc1b3501cb165003aefae1fda84
   languageName: node
   linkType: hard
 
@@ -15018,7 +15018,7 @@ __metadata:
     "@metamask/jazzicon": "npm:^2.0.0"
     "@metamask/sdk": "npm:^0.32.0"
     "@noble/hashes": "npm:^1.0.0"
-    "@pushchain/core": "npm:^5.1.4-alpha.3"
+    "@pushchain/core": "npm:^5.1.4-alpha.4"
     "@radix-ui/react-dialog": "npm:^1.1.1"
     "@radix-ui/react-dropdown-menu": "npm:^2.1.1"
     "@radix-ui/react-switch": "npm:^1.1.0"
