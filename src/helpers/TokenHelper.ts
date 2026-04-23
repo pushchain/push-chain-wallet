@@ -1,11 +1,14 @@
 import { viemClient } from "../utils/viemClient";
 import { pushTestnetChain } from "../utils/chainDetails";
 import { Address, createPublicClient, erc20Abi, formatUnits, http } from "viem";
+import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
+import { EVM_CHAIN_CONFIGS } from "../modules/wallet/Wallet.utils";
 
 type fetchTokenBalanceProps = {
     walletAddress: Address,
     tokenAddress?: Address,
-    decimals: number
+    decimals: number,
+    chain: CHAIN,
 }
 
 export const TOKEN_LISTS = {
@@ -50,24 +53,47 @@ export const TOKEN_LISTS = {
         },
     ],
 }
+
+export const getChainIdFromChain = (
+  chain: CHAIN
+): number | null => {
+  const [namespace, reference] = chain.split(":");
+
+  // EVM chains → eip155:<chainId>
+  if (namespace === "eip155") {
+    const id = Number(reference);
+    return Number.isFinite(id) ? id : null;
+  }
+
+  // Solana chains → no numeric chainId
+  if (namespace === "solana") {
+    return null;
+  }
+
+  return null;
+};
+
 export const fetchTokenBalance = async ({
     walletAddress,
     tokenAddress,
-    decimals
+    decimals,
+    chain
 }: fetchTokenBalanceProps) => {
+    const chainId = getChainIdFromChain(chain);
+    const chainConfig = EVM_CHAIN_CONFIGS[chainId as keyof typeof EVM_CHAIN_CONFIGS];
     const publicClient = createPublicClient({
-        chain: pushTestnetChain,
+        chain: chainConfig,
         transport: http(),
     });
 
     try {
 
         if (!tokenAddress) {
-            const nativeBalance = await viemClient.getBalance({ address: walletAddress });
+            const nativeBalance = await publicClient.getBalance({ address: walletAddress });
             return formatUnits(nativeBalance, decimals);
         }
 
-        const balance = await viemClient.readContract({
+        const balance = await publicClient.readContract({
             address: tokenAddress,
             abi: erc20Abi,
             functionName: 'balanceOf',

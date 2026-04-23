@@ -61,37 +61,14 @@ export function useTokenManager() {
                     pushChainClient.universal.origin.chain
                 ).tokens;
 
-                const prc20 = (
-                    await Promise.all(
-                        moveableTokens.map(async (token) => {
-                            try {
-                                const prc20Address = PushChain.utils.tokens.getPRC20Address(token);
+                console.log(moveableTokens);
 
-                                const prc20Symbol = await getTokenSymbol(prc20Address);
-
-                                return [{
-                                    name: prc20Symbol || token.symbol,
-                                    symbol: prc20Symbol || token.symbol,
-                                    address: prc20Address,
-                                    decimals: token.decimals,
-                                }];
-                            } catch {
-                                const prc20Address = getPrc20Address(token.symbol, token.chain);
-
-                                const prc20Symbol = await getTokenSymbol(prc20Address);
-
-                                return [{
-                                    name: prc20Symbol || token.symbol,
-                                    symbol: prc20Symbol || token.symbol,
-                                    address: prc20Address,
-                                    decimals: token.decimals,
-                                }];
-                            }
-                        })
-                    )
-                ).flatMap((x) => x);
-
-                setPrc20Tokens(prc20);
+                setPrc20Tokens(moveableTokens.map((token) => ({
+                    name: token.symbol,
+                    symbol: token.symbol,
+                    address: token.address,
+                    decimals: token.decimals,
+                })));
             } catch (err) {
                 console.error("Failed to load PRC20 tokens", err);
             }

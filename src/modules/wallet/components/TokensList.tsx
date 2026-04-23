@@ -50,7 +50,8 @@ const TokensList: FC<TokensListProps> = ({
                 {tokens.map((token: TokenFormat) => (
                     <TokensListItem token={token} key={token.address} />
                 ))}
-                {prc20Tokens.map((token: TokenFormat) => (
+                {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+                .map((token: TokenFormat) => (
                     <TokensListItem token={token} key={token.address} isPrc20 />
                 ))}
             </Box>

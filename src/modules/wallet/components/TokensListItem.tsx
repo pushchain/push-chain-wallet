@@ -14,12 +14,14 @@ type TokenListItemProps = {
 
 const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectToken }) => {
 
-  const { executorAddress } = usePushChain();
+  const { executorAddress, pushChainClient } = usePushChain();
+
+  const wallet = pushChainClient.universal.origin;
 
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
-  } = useTokenBalance(token.address, executorAddress, token.decimals);
+  } = useTokenBalance(token.address, wallet.address, wallet.chain, token.decimals);
 
   if (isPrc20 && (!tokenBalance || tokenBalance === '0')) {
     return null;

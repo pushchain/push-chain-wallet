@@ -4,6 +4,7 @@ import { createPublicClient, http } from 'viem';
 import { mainnet, sepolia, baseSepolia, arbitrumSepolia, bscTestnet } from 'viem/chains';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import { Wallet } from "../../context/GlobalContext";
+import { pushTestnetChain } from "../../utils/chainDetails";
 
 export const getWalletlist = (wallet: Wallet) => {
   const walletList = [];
@@ -163,12 +164,13 @@ export function toCAIPFormat(
   return `${namespace}:${formattedChainId}:${formattedAddress}`;
 }
 
-const EVM_CHAIN_CONFIGS = {
+export const EVM_CHAIN_CONFIGS = {
   1: mainnet,
   11155111: sepolia,
   84532: baseSepolia,
   421614: arbitrumSepolia,
   97: bscTestnet,
+  42101: pushTestnetChain,
 };
 
 export async function getNativeTokenBalance(token, walletDetail): Promise<{ balance: string, loading: boolean }> {
