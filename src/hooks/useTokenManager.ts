@@ -61,8 +61,6 @@ export function useTokenManager() {
                     pushChainClient.universal.origin.chain
                 ).tokens;
 
-                console.log(moveableTokens);
-
                 setPrc20Tokens(moveableTokens.map((token) => ({
                     name: token.symbol,
                     symbol: token.symbol,
