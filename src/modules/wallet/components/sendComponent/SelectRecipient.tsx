@@ -6,6 +6,7 @@ import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 import { useTokenBalance } from "../../../../hooks/useTokenBalance";
+import { usePushChain } from "../../../../context/PushChainContext";
 
 const SelectRecipient = () => {
   const {
@@ -20,11 +21,17 @@ const SelectRecipient = () => {
   } = useSendTokenContext();
 
   const { setActiveState } = useWalletDashboard();
+  const { pushChainClient } = usePushChain();
 
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
-  } = useTokenBalance(tokenSelected.address, walletAddress, tokenSelected.decimals);
+  } = useTokenBalance(
+    tokenSelected.address,
+    walletAddress,
+    pushChainClient?.universal.origin.chain,
+    tokenSelected.decimals
+  );
 
   return (
     <>
@@ -47,7 +54,7 @@ const SelectRecipient = () => {
         `}
       >
         <Text variant="h3-semibold" color="pw-int-text-primary-color">
-          Send PC{" "}
+          Send {tokenSelected.symbol}{" "}
         </Text>
 
         <Box

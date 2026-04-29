@@ -1,6 +1,6 @@
 import { viemClient } from "../utils/viemClient";
 import { pushTestnetChain } from "../utils/chainDetails";
-import { Address, createPublicClient, erc20Abi, formatUnits, http } from "viem";
+import { Address, createPublicClient, erc20Abi, formatUnits, http, isAddress } from "viem";
 import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
 import { EVM_CHAIN_CONFIGS } from "../modules/wallet/Wallet.utils";
 
@@ -79,6 +79,10 @@ export const fetchTokenBalance = async ({
     decimals,
     chain
 }: fetchTokenBalanceProps) => {
+    if (tokenAddress && !isAddress(tokenAddress)) {
+        return "0";
+    }
+
     const chainId = getChainIdFromChain(chain);
     const chainConfig = EVM_CHAIN_CONFIGS[chainId as keyof typeof EVM_CHAIN_CONFIGS];
     const publicClient = createPublicClient({

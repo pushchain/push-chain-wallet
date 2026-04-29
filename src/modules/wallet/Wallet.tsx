@@ -24,6 +24,7 @@ import { Receive } from "./components/Receive";
 import { Send } from "./components/sendComponent/Send";
 import { WalletDashboardProvider } from "../../context/WalletDashboardContext";
 import { ActiveStates, PushNetworks, WalletListType } from "src/types";
+import { TokenFormat } from "../../types";
 import { bytesToHex, stringToBytes } from "viem";
 import { Reconnect } from "./components/Reconnect";
 import WalletRecoveryPhrase from "./components/WalletRecoveryPhrase";
@@ -53,6 +54,12 @@ const Wallet: FC<WalletProps> = () => {
   const persistQuery = usePersistedQuery();
   const [activeState, setActiveState] = useState<ActiveStates>('walletDashboard');
   const [selectedNetwork, setSelectedNetwork] = useState<PushNetworks>('Push Testnet Donut');
+  const [sendTokenSelection, setSendTokenSelection] = useState<TokenFormat | null>(null);
+
+  const startSendFlow = (token?: TokenFormat | null) => {
+    setSendTokenSelection(token ?? null);
+    setActiveState('send');
+  };
 
   const createWalletAndGenerateMnemonic = async (userId: string) => {
     try {
@@ -317,13 +324,14 @@ const Wallet: FC<WalletProps> = () => {
             setConnectionSuccess={setConnectionSuccess}
             activeState={activeState}
             setActiveState={setActiveState}
+            startSendFlow={startSendFlow}
             selectedNetwork={selectedNetwork}
             setSelectedNetwork={setSelectedNetwork}
           >
             {activeState === 'walletDashboard' && <WalletDashboard />}
             {activeState === 'addTokens' && <AddTokens />}
             {activeState === 'receive' && <Receive />}
-            {activeState === 'send' && <Send />}
+            {activeState === 'send' && <Send initialToken={sendTokenSelection} />}
             {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
             <Reconnect />
             {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (

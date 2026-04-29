@@ -9,6 +9,7 @@ import { usePushChain } from '../../../context/PushChainContext';
 import { convertCaipToObject, getWalletlist } from '../Wallet.utils';
 import { css } from 'styled-components';
 import { PushChain } from '@pushchain/core';
+import { useWalletDashboard } from '../../../context/WalletDashboardContext';
 
 type TokensListProps = {
     setActiveState: (activeStates: ActiveStates) => void;
@@ -20,6 +21,7 @@ const TokensList: FC<TokensListProps> = ({
     const { tokens, prc20Tokens } = useTokenManager();
     const { state } = useGlobalState();
     const { executorAddress } = usePushChain();
+    const { startSendFlow } = useWalletDashboard();
 
     const pushWallet = useMemo(() => getWalletlist(state.wallet)[0], [state.wallet]);
     const readOnlyWallet = state.pushWallet ? PushChain.utils.account.toChainAgnostic(state.pushWallet.address, { chain: state.pushWallet.chain }) : null;
@@ -48,11 +50,11 @@ const TokensList: FC<TokensListProps> = ({
             >
                 {executorAddress !== result.address && <OriginChainTokenList originWalletAddress={parsedWallet} />}
                 {tokens.map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} />
+                    <TokensListItem token={token} key={token.address} handleSelectToken={startSendFlow} />
                 ))}
                 {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                 .map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} isPrc20 />
+                    <TokensListItem token={token} key={token.address} isPrc20 handleSelectToken={startSendFlow} />
                 ))}
             </Box>
             <Box
