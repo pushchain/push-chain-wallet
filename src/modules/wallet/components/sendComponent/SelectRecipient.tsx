@@ -21,15 +21,14 @@ const SelectRecipient = () => {
   } = useSendTokenContext();
 
   const { setActiveState } = useWalletDashboard();
-  const { pushChainClient } = usePushChain();
+  const { executorAddress } = usePushChain();
 
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
   } = useTokenBalance(
     tokenSelected.address,
-    walletAddress,
-    pushChainClient?.universal.origin.chain,
+    executorAddress,
     tokenSelected.decimals
   );
 
