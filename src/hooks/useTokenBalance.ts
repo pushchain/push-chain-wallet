@@ -1,18 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchTokenBalance } from '../helpers/TokenHelper';
-import { Address } from 'viem';
-import { CHAIN } from '@pushchain/core/src/lib/constants/enums';
+import { Address, isAddress } from 'viem';
 
-export const useTokenBalance = (tokenAddress: string, walletAddress: string, chain: CHAIN, decimals: number = 18) => {
-    const shouldFetch = !!walletAddress;
+export const useTokenBalance = (tokenAddress: string, walletAddress: string, decimals: number = 18) => {
+    const hasValidTokenAddress = !tokenAddress || isAddress(tokenAddress);
+    const shouldFetch = !!walletAddress && hasValidTokenAddress;
     const pollMs = 15_000;
 
     return useQuery({
-        queryKey: ['tokenBalance', walletAddress, tokenAddress],
+        queryKey: ['tokenBalance', walletAddress, tokenAddress, decimals],
         queryFn: () => fetchTokenBalance({
             walletAddress: walletAddress as Address,
             tokenAddress: tokenAddress as Address,
-            chain,
             decimals
         }),
         enabled: shouldFetch,

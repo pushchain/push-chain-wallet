@@ -31,9 +31,13 @@ const SendContent = () => {
     );
 };
 
-const Send = () => {
+type SendProps = {
+    initialToken?: TokenFormat | null;
+};
+
+const Send = ({ initialToken }: SendProps) => {
     return (
-        <SendTokenProvider>
+        <SendTokenProvider initialToken={initialToken}>
             <SendContent />
         </SendTokenProvider>
     );

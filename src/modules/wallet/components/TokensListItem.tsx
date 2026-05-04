@@ -13,15 +13,12 @@ type TokenListItemProps = {
 };
 
 const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectToken }) => {
-
-  const { executorAddress, pushChainClient } = usePushChain();
-
-  const wallet = pushChainClient.universal.origin;
+  const { executorAddress } = usePushChain();
 
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
-  } = useTokenBalance(token.address, wallet.address, wallet.chain, token.decimals);
+  } = useTokenBalance(token.address, executorAddress, token.decimals);
 
   if (isPrc20 && (!tokenBalance || tokenBalance === '0')) {
     return null;
@@ -36,7 +33,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectTo
       alignItems="center"
       borderRadius="radius-sm"
       border="border-sm solid pw-int-border-secondary-color"
-      onClick={() => handleSelectToken(token)}
+      onClick={() => handleSelectToken?.(token)}
       cursor={handleSelectToken && 'pointer'}
     >
       <Box display="flex" gap="spacing-xxs" alignItems="center">

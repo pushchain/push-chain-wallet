@@ -22,14 +22,14 @@ const buttonConfigs = [
   {
     icon: Download,
     label: "Receive",
-    onClick: (setActiveState: (state: string) => void) =>
+    onClick: (setActiveState: (state: string) => void, startSendFlow: () => void) =>
       setActiveState("receive"),
   },
   {
     icon: SendNotification,
     label: "Send",
-    onClick: (setActiveState: (state: string) => void) =>
-      setActiveState("send"),
+    onClick: (_setActiveState: (state: string) => void, startSendFlow: () => void) =>
+      startSendFlow(),
   },
   {
     icon: IconLeading,
@@ -39,7 +39,7 @@ const buttonConfigs = [
 ];
 
 const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
-  const { setActiveState } = useWalletDashboard();
+  const { setActiveState, startSendFlow } = useWalletDashboard();
   const [ fontSize, setFontSize ] = useState(34);
 
   const ref = useRef<HTMLDivElement>(null);
@@ -48,6 +48,9 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
     data: balance,
     isLoading: isBalanceLoading,
   } = useWalletOperations(walletAddress);
+
+  console.log("Balance", balance);
+  
 
   useEffect(() => {
     const el = ref.current;
@@ -139,7 +142,7 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
             border="border-sm solid pw-int-border-primary-color"
             cursor="pointer"
             backgroundColor="pw-int-bg-primary-color"
-            onClick={() => onClick(setActiveState)}
+            onClick={() => onClick(setActiveState, startSendFlow)}
           >
             <Icon color="pw-int-icon-brand-color" size={24} />
             <Text variant="bes-semibold">{label}</Text>

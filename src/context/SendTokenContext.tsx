@@ -27,12 +27,15 @@ const SendTokenContext = createContext<SendTokenContextType | undefined>(
   undefined
 );
 
-export const SendTokenProvider: React.FC<{ children: ReactNode }> = ({
+export const SendTokenProvider: React.FC<{ children: ReactNode; initialToken?: TokenFormat | null }> = ({
   children,
+  initialToken = null,
 }) => {
 
-  const [sendState, setSendState] = useState<SendTokenState>("selectToken");
-  const [tokenSelected, setTokenSelected] = useState<TokenFormat | null>(null);
+  const [sendState, setSendState] = useState<SendTokenState>(
+    initialToken ? "selectRecipient" : "selectToken"
+  );
+  const [tokenSelected, setTokenSelected] = useState<TokenFormat | null>(initialToken);
   const [receiverAddress, setReceiverAddress] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
 
