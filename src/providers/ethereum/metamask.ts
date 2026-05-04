@@ -41,11 +41,10 @@ export class MetamaskProvider extends BaseWalletProvider {
   }
 
   isInstalled = async (): Promise<boolean> => {
-    const provider = this.sdk.getProvider();
     if (window.ethereum && window.ethereum.isMetaMask) return true;
 
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    if (isMobile && provider?.isMetaMask) return true;
+    if (isMobile) return true;
 
     return false;
   };

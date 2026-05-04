@@ -66,7 +66,7 @@ export const walletCategories: WalletCategoriesType[] = [
     wallet: "ethereum",
     label: "Connect Ethereum Wallet",
     icon: <Ethereum width={24} height={24} />,
-    isMobile: false,
+    isMobile: true,
   },
   {
     chain: ChainType.SOLANA,

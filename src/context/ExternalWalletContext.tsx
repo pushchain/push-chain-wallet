@@ -9,7 +9,7 @@ import { walletRegistry } from "../providers/WalletProviderRegistry";
 
 type ExternalWalletContextType = {
   externalWallet: ExternalWalletType | null;
-  setExternalWallet: React.Dispatch<React.SetStateAction<ExternalWalletType>>;
+  setExternalWallet: React.Dispatch<React.SetStateAction<ExternalWalletType | null>>;
   connecting: boolean;
   connect: (
     provider: IWalletProvider,
@@ -25,12 +25,33 @@ type ExternalWalletContextType = {
 
 const ExternalWalletContext = createContext<ExternalWalletContextType | undefined>(undefined);
 
+const getStoredExternalWallet = (): ExternalWalletType | null => {
+  try {
+    const walletInfo = localStorage.getItem("walletInfo");
+    const walletData = walletInfo ? JSON.parse(walletInfo) : null;
+
+    if (
+      walletData?.originAddress &&
+      walletData?.providerName &&
+      walletData?.chainType
+    ) {
+      return walletData;
+    }
+  } catch (error) {
+    console.error("Failed to read stored external wallet:", error);
+  }
+
+  return null;
+};
+
 export const ExternalWalletContextProvider = ({
   children,
 }: {
   children: ReactNode;
 }) => {
-  const [externalWallet, setExternalWallet] = useState<ExternalWalletType | null>(null);
+  const [externalWallet, setExternalWallet] = useState<ExternalWalletType | null>(
+    getStoredExternalWallet
+  );
   const [currentProvider, setCurrentProvider] =
     useState<IWalletProvider | null>(null);
   const [connecting, setConnecting] = useState(false);
