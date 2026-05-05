@@ -47,6 +47,9 @@ import {
   Zerion,
   Rabby,
   USDT,
+  USDC,
+  PUSD,
+  StETH,
   WEthereum,
   PushMonotone,
   BaseMonotone,
@@ -80,14 +83,14 @@ export const walletCategories: WalletCategoriesType[] = [
     wallet: "base",
     label: "Connect Base Wallet",
     icon: <Base width={24} height={24} />,
-    isMobile: false,
+    isMobile: true,
   },
   {
     chain: ChainType.ARBITRUM,
     wallet: "arbitrum",
     label: "Connect Arbitrum Wallet",
     icon: <Arbitrum width={24} height={24} />,
-    isMobile: false,
+    isMobile: true,
   },
   {
     chain: ChainType.BINANCE,
@@ -164,9 +167,33 @@ export const TOKEN_LOGO = {
   pETH: Ethereum,
   pPOL: Polygon,
   PC: PushChainLogo,
+  WPC: PushChainLogo,
   USDT: USDT,
   WETH: WEthereum,
+  pBNB: BNB,
+  pSOL: Solana,
+  USDC,
+  PUSD,
+  stETH: StETH,
 };
+
+/** Resolves symbols like `pETH.base` or `USDT.eth` to a `TOKEN_LOGO` key. */
+export function resolveTokenLogoKey(
+  tokenSymbol: string
+): keyof typeof TOKEN_LOGO | undefined {
+  let candidate = tokenSymbol;
+  while (candidate) {
+    if (candidate in TOKEN_LOGO) {
+      return candidate as keyof typeof TOKEN_LOGO;
+    }
+    const lastDot = candidate.lastIndexOf(".");
+    if (lastDot <= 0) {
+      break;
+    }
+    candidate = candidate.slice(0, lastDot);
+  }
+  return undefined;
+}
 
 export const WALLETS_LOGO = {
   coinbasesolana: <CoinbaseIcon />,

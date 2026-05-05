@@ -129,6 +129,12 @@ export { default as PolygonZK } from './components/PolygonZK';
 
 export { default as USDT } from './components/USDT';
 
+export { default as USDC } from './components/USDC';
+
+export { default as PUSD } from './components/PUSD';
+
+export { default as StETH } from './components/StETH';
+
 export { default as WEthereum } from './components/WEthereum';
 
 export { default as YellowBonusActivitySubscribers } from './components/YellowBonusActivitySubscribers';
