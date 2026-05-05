@@ -1,5 +1,5 @@
 import React, { FC } from "react";
-import { ChainType, WalletCategoriesType } from "../../../types/wallet.types";
+import { WalletCategoriesType } from "../../../types/wallet.types";
 import { walletRegistry } from "../../../providers/WalletProviderRegistry";
 import WalletSelector from "./WalletSelector";
 import { Box, deviceSizes, Text } from "blocks";
@@ -12,7 +12,7 @@ interface ChainWalletSelectorProps {
 const ChainSelector: FC<ChainWalletSelectorProps> = ({ selectedWalletCategory }) => {
   const isMobile = useDeviceWidthCheck(parseInt(deviceSizes.laptop));
   const wallets = walletRegistry.getProvidersByChain(selectedWalletCategory.chain);
-  const filteredWallets = isMobile && selectedWalletCategory.chain === ChainType.ETHEREUM
+  const filteredWallets = isMobile && wallets.some((wallet) => wallet.name === "MetaMask")
     ? wallets.filter((wallet) => wallet.name === "MetaMask")
     : wallets;
 

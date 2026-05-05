@@ -1,11 +1,12 @@
 import React from 'react';
-import { TOKEN_LOGO } from '../Common.constants';
+import { resolveTokenLogoKey, TOKEN_LOGO } from '../Common.constants';
 import { Box, PushChainLogo, Text } from 'blocks';
 import { css } from 'styled-components';
 
 const TokenLogoComponent = ({ tokenSymbol }: { tokenSymbol: string }) => {
 
-    const IconComponent = TOKEN_LOGO[tokenSymbol];
+    const logoKey = resolveTokenLogoKey(tokenSymbol);
+    const IconComponent = logoKey ? TOKEN_LOGO[logoKey] : undefined;
     if (IconComponent) {
         return (
             <Box
@@ -21,7 +22,7 @@ const TokenLogoComponent = ({ tokenSymbol }: { tokenSymbol: string }) => {
                     overflow="hidden"
                     alignSelf="center"
                 >
-                    <IconComponent width={36} height={36} />;
+                    <IconComponent width={36} height={36} />
                 </Box>
                 <Box
                     position="absolute"
