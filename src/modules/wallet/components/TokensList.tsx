@@ -18,7 +18,7 @@ const TokensList: FC<TokensListProps> = ({
     setActiveState
 }) => {
 
-    const { tokens, prc20Tokens } = useTokenManager();
+    const { tokens, moveableTokens } = useTokenManager();
     const { state } = useGlobalState();
     const { executorAddress } = usePushChain();
     const { startSendFlow } = useWalletDashboard();
@@ -50,11 +50,11 @@ const TokensList: FC<TokensListProps> = ({
             >
                 {executorAddress !== result.address && <OriginChainTokenList originWalletAddress={parsedWallet} />}
                 {tokens.map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} handleSelectToken={startSendFlow} />
+                    <TokensListItem token={token} key={token.address} walletDetails={result} handleSelectToken={startSendFlow} />
                 ))}
-                {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+                {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                 .map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} isPrc20 handleSelectToken={startSendFlow} />
+                    <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={startSendFlow} />
                 ))}
             </Box>
             <Box

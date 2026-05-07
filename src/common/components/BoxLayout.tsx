@@ -83,8 +83,8 @@ const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
     >
       <Box
         backgroundColor="pw-int-bg-secondary-color"
-        borderRadius="radius-md"
         css={css`
+          border-radius: var(--pw-int-modal-border-radius);
           overflow: auto;
           max-height: 100vh;
           width: 100%;

@@ -22,6 +22,7 @@ const ERC20_ABI = [
 export function useTokenManager() {
     const [tokens, setTokens] = useState<TokenFormat[]>([DEFAULT_TOKEN]);
     const [prc20Tokens, setPrc20Tokens] = useState<TokenFormat[]>([]);
+    const [moveableTokens, setMoveableTokens] = useState<TokenFormat[]>([]);
 
     const { pushChainClient } = usePushChain();
 
@@ -51,17 +52,17 @@ export function useTokenManager() {
 
     useEffect(() => {
         if (!pushChainClient) {
-            setPrc20Tokens([]);
+            setMoveableTokens([]);
             return;
         }
 
-        const loadPrc20Tokens = async () => {
+        const loadMoveableTokens = async () => {
             try {
                 const moveableTokens = PushChain.utils.tokens.getMoveableTokens(
                     pushChainClient.universal.origin.chain
                 ).tokens;
 
-                setPrc20Tokens(moveableTokens.map((token) => ({
+                setMoveableTokens(moveableTokens.map((token) => ({
                     name: token.symbol,
                     symbol: token.symbol,
                     address: token.address,
@@ -72,7 +73,7 @@ export function useTokenManager() {
             }
         }
 
-        loadPrc20Tokens();
+        loadMoveableTokens();
         
     }, [pushChainClient]);
 
@@ -115,5 +116,5 @@ export function useTokenManager() {
         setTokens(prev => prev.filter(t => t.address.toLowerCase() !== address.toLowerCase()));
     };
 
-    return { tokens, prc20Tokens, addToken, removeToken, fetchTokenDetails };
+    return { tokens, moveableTokens, prc20Tokens, addToken, removeToken, fetchTokenDetails };
 }

@@ -1,9 +1,10 @@
 import React from 'react';
 import { TOKEN_LOGO } from '../Common.constants';
-import { Box, PushChainLogo, Text } from 'blocks';
+import { Box, Text } from 'blocks';
 import { css } from 'styled-components';
+import { getChainIcon } from '../../modules/wallet/components/OriginChainTokenListItem';
 
-const TokenLogoComponent = ({ tokenSymbol }: { tokenSymbol: string }) => {
+const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, chainId: string | null }) => {
 
     const IconComponent = TOKEN_LOGO[tokenSymbol];
     if (IconComponent) {
@@ -38,7 +39,7 @@ const TokenLogoComponent = ({ tokenSymbol }: { tokenSymbol: string }) => {
                             right: 0;
                         `}
                 >
-                    <PushChainLogo height={16} width={16} />
+                    {getChainIcon(chainId, 16)}
                 </Box>
             </Box>
         )

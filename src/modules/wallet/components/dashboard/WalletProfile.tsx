@@ -49,9 +49,6 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
     isLoading: isBalanceLoading,
   } = useWalletOperations(walletAddress);
 
-  console.log("Balance", balance);
-  
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

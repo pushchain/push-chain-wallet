@@ -109,6 +109,8 @@ export { default as StakePushYellowCoin } from './components/StakePushYellowCoin
 
 export { default as StakePushYellowMultiplier } from './components/StakePushYellowMultiplier';
 
+export { default as StEthereum } from './components/StEthereum';
+
 export { default as Solana } from './components/Solana';
 
 export { default as SubscribePoints } from './components/SubscribePoints';
@@ -126,6 +128,8 @@ export { default as PushLogo } from './components/PushLogo';
 export { default as Polygon } from './components/Polygon';
 
 export { default as PolygonZK } from './components/PolygonZK';
+
+export { default as USDC } from './components/USDC';
 
 export { default as USDT } from './components/USDT';
 

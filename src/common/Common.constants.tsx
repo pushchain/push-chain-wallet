@@ -50,6 +50,8 @@ import {
   WEthereum,
   PushMonotone,
   BaseMonotone,
+  USDC,
+  StEthereum,
 } from "../blocks";
 import { ChainType, WalletCategoriesType } from "../types/wallet.types";
 
@@ -166,6 +168,8 @@ export const TOKEN_LOGO = {
   PC: PushChainLogo,
   USDT: USDT,
   WETH: WEthereum,
+  USDC: USDC,
+  stETH: StEthereum,
 };
 
 export const WALLETS_LOGO = {

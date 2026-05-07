@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { Box, Text } from "blocks";
-import { TokenFormat } from "../../../types";
+import { TokenFormat, WalletType } from "../../../types";
 import { TokenLogoComponent } from "common";
 import { useTokenBalance } from "../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../context/PushChainContext";
@@ -8,11 +8,12 @@ import { formatTokenValue } from "../Wallet.utils";
 
 type TokenListItemProps = {
   token: TokenFormat;
-  isPrc20?: boolean;
+  walletDetails: WalletType;
+  isMoveable?: boolean;
   handleSelectToken?: (token: TokenFormat) => void;
 };
 
-const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectToken }) => {
+const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveable = false, handleSelectToken }) => {
   const { executorAddress } = usePushChain();
 
   const {
@@ -20,7 +21,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectTo
     isLoading: loadingTokenBalance
   } = useTokenBalance(token.address, executorAddress, token.decimals);
 
-  if (isPrc20 && (!tokenBalance || tokenBalance === '0')) {
+  if (!tokenBalance || tokenBalance === '0') {
     return null;
   }
 
@@ -37,7 +38,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, isPrc20, handleSelectTo
       cursor={handleSelectToken && 'pointer'}
     >
       <Box display="flex" gap="spacing-xxs" alignItems="center">
-        <TokenLogoComponent tokenSymbol={token.symbol} />
+        <TokenLogoComponent tokenSymbol={token.symbol} chainId={isMoveable ? walletDetails.chainId : null} />
         <Box display="flex" flexDirection="column">
           <Text variant="bm-semibold" color="pw-int-text-primary-color">
             {token.name}

@@ -4,6 +4,18 @@ import { css } from 'styled-components';
 import { useState, useEffect } from 'react';
 import { getNativeTokenBalance } from '../Wallet.utils';
 
+export function getChainIcon(chainId, size) {
+    if (chainId == null || chainId === 'devnet') {
+        return <PushChainLogo width={size} height={size} />
+    }
+    const IconComponent = CHAIN_LOGO?.[chainId];
+    if (IconComponent) {
+        return <IconComponent width={size} height={size} color="pw-int-icon-tertiary-color" />;
+    } else {
+        return <PushChainLogo width={size} height={size} />;
+    }
+}
+
 const OriginChainTokenListItem = ({
     token,
     walletDetail
@@ -32,18 +44,6 @@ const OriginChainTokenListItem = ({
     }, [token, walletDetail]);
 
     const [faucetHovered, setFaucetHovered] = useState(false);
-
-    function getChainIcon(chainId, size) {
-        if (chainId == null || chainId === 'devnet') {
-            return <PushChainLogo width={size} height={size} />
-        }
-        const IconComponent = CHAIN_LOGO?.[chainId];
-        if (IconComponent) {
-            return <IconComponent width={size} height={size} color="pw-int-icon-tertiary-color" />;
-        } else {
-            return <PushChainLogo width={size} height={size} />;
-        }
-    }
 
     return (
         <Box
