@@ -5,6 +5,16 @@ import { APP_ROUTES } from "../constants";
 import { getAppParamValue, WALLET_TO_APP_ACTION } from "common";
 import { ChainType, IWalletProvider, ExternalWalletType } from "../types/wallet.types";
 
+const isMobileBrowser = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+const openInPhantomBrowser = () => {
+  const currentUrl = window.location.href;
+  const refUrl = window.location.origin;
+  const phantomBrowseUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(refUrl)}`;
+
+  window.location.assign(phantomBrowseUrl);
+};
+
 export const useConnectExternalWallet = () => {
   const { connect, isWalletInstalled } = useExternalWallet();
   const { dispatch } = useGlobalState();
@@ -13,7 +23,14 @@ export const useConnectExternalWallet = () => {
 
   const connectWithProvider = async (provider: IWalletProvider, chainType?: ChainType) => {
     const installed = await isWalletInstalled(provider);
-    if (!installed) return { ok: false, reason: "not_installed" as const };
+    if (!installed) {
+      if (!isOpenedInIframe && provider.name === "Phantom" && isMobileBrowser()) {
+        openInPhantomBrowser();
+        return { ok: true as const };
+      }
+
+      return { ok: false, reason: "not_installed" as const };
+    }
 
     if (isOpenedInIframe) {
       window.parent?.postMessage(

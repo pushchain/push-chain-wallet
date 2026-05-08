@@ -5,6 +5,8 @@ import WalletSelector from "./WalletSelector";
 import { Box, deviceSizes, Text } from "blocks";
 import { useDeviceWidthCheck } from "common";
 
+const MOBILE_WALLET_OPTIONS = ["MetaMask", "Phantom"];
+
 interface ChainWalletSelectorProps {
   selectedWalletCategory: WalletCategoriesType;
 }
@@ -12,8 +14,11 @@ interface ChainWalletSelectorProps {
 const ChainSelector: FC<ChainWalletSelectorProps> = ({ selectedWalletCategory }) => {
   const isMobile = useDeviceWidthCheck(parseInt(deviceSizes.laptop));
   const wallets = walletRegistry.getProvidersByChain(selectedWalletCategory.chain);
-  const filteredWallets = isMobile && wallets.some((wallet) => wallet.name === "MetaMask")
-    ? wallets.filter((wallet) => wallet.name === "MetaMask")
+  const hasMobileWalletOptions = wallets.some((wallet) =>
+    MOBILE_WALLET_OPTIONS.includes(wallet.name)
+  );
+  const filteredWallets = isMobile && hasMobileWalletOptions
+    ? wallets.filter((wallet) => MOBILE_WALLET_OPTIONS.includes(wallet.name))
     : wallets;
 
   if (filteredWallets.length === 0) {

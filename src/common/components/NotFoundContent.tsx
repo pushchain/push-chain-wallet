@@ -18,6 +18,13 @@ const WALLETS_LINKS = {
   rabby: 'https://rabby.io/',
 };
 
+const WALLETS_LABELS = {
+  phantom: 'Phantom',
+  metamask: 'MetaMask',
+  zerion: 'Zerion',
+  rabby: 'Rabby',
+};
+
 export type NotFoundContentProps = {
   providerName: 'metamask' | 'zerion' | 'rabby' | 'phantom';
 	onClose?: () => void;
@@ -28,6 +35,7 @@ const NotFoundContent: FC<NotFoundContentProps> = ({
 	onClose
 }) => {
 	const Logo = WALLETS_LOGO[providerName];
+  const walletLabel = WALLETS_LABELS[providerName];
 
   return (
     <Box
@@ -70,14 +78,14 @@ const NotFoundContent: FC<NotFoundContentProps> = ({
 					textAlign='center'
 					textTransform="capitalize"
 				>
-					{providerName} Wallet not Found
+					{walletLabel} Wallet not Found
 				</Text>
 				<Text
 					variant='bs-regular'
 					color='pw-int-text-secondary-color'
 					textAlign='center'
 				>
-					To connect to Zerion, install and open the app. Confirm the connection to proceed.
+					To connect to {walletLabel}, install and open the app. Confirm the connection to proceed.
 				</Text>
 			</Box>
 			<Box
@@ -111,7 +119,7 @@ const NotFoundContent: FC<NotFoundContentProps> = ({
 					<Logo height={36} width={36} />
 				</Box>
 				<Text textTransform="capitalize" variant="bm-semibold" color="pw-int-text-primary-color">
-					Install {providerName} Wallet
+					Install {walletLabel} Wallet
 				</Text>
 			</Box>
     </Box>
