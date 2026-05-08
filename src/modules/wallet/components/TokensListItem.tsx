@@ -19,7 +19,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
-  } = useTokenBalance(token.address, executorAddress, token.decimals);
+  } = useTokenBalance(token.address, executorAddress, token.decimals, isMoveable ? walletDetails : null);
 
   if (!tokenBalance || tokenBalance === '0') {
     return null;

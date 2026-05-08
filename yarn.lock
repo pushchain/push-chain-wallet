@@ -6311,7 +6311,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/spl-token-metadata@npm:^0.1.4":
+"@solana/spl-token-group@npm:^0.0.7":
+  version: 0.0.7
+  resolution: "@solana/spl-token-group@npm:0.0.7"
+  dependencies:
+    "@solana/codecs": "npm:2.0.0-rc.1"
+  peerDependencies:
+    "@solana/web3.js": ^1.95.3
+  checksum: 10/9a048fee471e1e829b39c30991f2e168bcf5b2ad269f891cf6148c0226f66463a221545e306e395e43826dd7e44de431a1266b70e366bb0682d4b8f799f5195b
+  languageName: node
+  linkType: hard
+
+"@solana/spl-token-metadata@npm:^0.1.4, @solana/spl-token-metadata@npm:^0.1.6":
   version: 0.1.6
   resolution: "@solana/spl-token-metadata@npm:0.1.6"
   dependencies:
@@ -6334,6 +6345,21 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.91.6
   checksum: 10/944f5a5b4401fd21e17358f33278bd03e978f229682810f40fcd783a3f71cb05841c051b91352ffec1da3e7d3070c0307639c6b2b42312f50fc8ecbe78a3460d
+  languageName: node
+  linkType: hard
+
+"@solana/spl-token@npm:^0.4.14":
+  version: 0.4.14
+  resolution: "@solana/spl-token@npm:0.4.14"
+  dependencies:
+    "@solana/buffer-layout": "npm:^4.0.0"
+    "@solana/buffer-layout-utils": "npm:^0.2.0"
+    "@solana/spl-token-group": "npm:^0.0.7"
+    "@solana/spl-token-metadata": "npm:^0.1.6"
+    buffer: "npm:^6.0.3"
+  peerDependencies:
+    "@solana/web3.js": ^1.95.5
+  checksum: 10/c10cee32f8e01f73ea0ed12a6a5c241516125843b23db67ea7abb1c5f0083333474c5104b247dd4bdcc6a18e4bd86465a87ddcf76a8a55172e83a2d7c39123c8
   languageName: node
   linkType: hard
 
@@ -15027,6 +15053,7 @@ __metadata:
     "@reach/tabs": "npm:^0.18.0"
     "@scure/bip32": "npm:^1.4.0"
     "@scure/bip39": "npm:^1.3.0"
+    "@solana/spl-token": "npm:^0.4.14"
     "@solana/web3.js": "npm:^1.98.2"
     "@table-library/react-table-library": "npm:^4.1.7"
     "@tanstack/react-query": "npm:^5.81.2"
