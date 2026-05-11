@@ -61,15 +61,28 @@ export const fetchTokenBalance = async ({
     decimals,
     walletDetails,
 }: fetchTokenBalanceProps) => {
-    if (tokenAddress && !isAddress(tokenAddress)) {
-        return "0";
-    }
+    
+    // if (tokenAddress && !isAddress(tokenAddress)) {
+    //     return "0";
+    // }
 
     try {
 
         if (!tokenAddress) {
             const nativeBalance = await viemClient.getBalance({ address: walletAddress });
             return formatUnits(nativeBalance, decimals);
+        }
+
+        if (!walletDetails) {
+            const balance = await viemClient.readContract({
+                address: tokenAddress,
+                abi: erc20Abi,
+                functionName: 'balanceOf',
+                args: [walletAddress],
+                authorizationList: []
+            });
+
+            return formatUnits(balance as bigint, decimals);
         }
 
         if (walletDetails?.chain?.toLowerCase() === 'solana') {

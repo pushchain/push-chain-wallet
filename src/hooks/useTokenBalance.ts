@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchTokenBalance } from '../helpers/TokenHelper';
-import { Address, isAddress } from 'viem';
+import { Address } from 'viem';
 import { WalletType } from '../types';
 
 export const useTokenBalance = (tokenAddress: string, walletAddress: string, decimals: number = 18, walletDetails: WalletType | null = null) => {
-    const hasValidTokenAddress = !tokenAddress || isAddress(tokenAddress);
-    const shouldFetch = !!walletAddress && hasValidTokenAddress;
+    // const hasValidTokenAddress = !tokenAddress || isAddress(tokenAddress);
+    // const shouldFetch = !!walletAddress && hasValidTokenAddress;
     const pollMs = 15_000;
 
     return useQuery({
@@ -16,7 +16,7 @@ export const useTokenBalance = (tokenAddress: string, walletAddress: string, dec
             decimals,
             walletDetails
         }),
-        enabled: shouldFetch,
+        enabled: true,
         refetchInterval: pollMs,
         refetchIntervalInBackground: true,
         staleTime: pollMs - 1000,

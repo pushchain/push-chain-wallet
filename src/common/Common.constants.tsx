@@ -52,6 +52,9 @@ import {
   BaseMonotone,
   USDC,
   StEthereum,
+  DAI,
+  PUSD,
+  PUSDPlus,
 } from "../blocks";
 import { ChainType, WalletCategoriesType } from "../types/wallet.types";
 
@@ -164,12 +167,20 @@ export const CHAIN_LOGO: {
 
 export const TOKEN_LOGO = {
   pETH: Ethereum,
+  pETH_ARB: Ethereum,
+  pETH_BASE: Ethereum,
+  pBNB: BNB,
+  pSOL: Solana,
   pPOL: Polygon,
   PC: PushChainLogo,
+  WPC: PushChainLogo,
   USDT: USDT,
   WETH: WEthereum,
   USDC: USDC,
   stETH: StEthereum,
+  DAI: DAI,
+  PUSD: PUSD,
+  "PUSD+": PUSDPlus,
 };
 
 export const WALLETS_LOGO = {

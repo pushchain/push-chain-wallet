@@ -58,23 +58,103 @@ export function useTokenManager() {
 
         const loadMoveableTokens = async () => {
             try {
-                const moveableTokens = PushChain.utils.tokens.getMoveableTokens(
+                const tokens = PushChain.utils.tokens.getMoveableTokens(
                     pushChainClient.universal.origin.chain
                 ).tokens;
 
-                setMoveableTokens(moveableTokens.map((token) => ({
+                setMoveableTokens(tokens.map((token) => ({
                     name: token.symbol,
                     symbol: token.symbol,
                     address: token.address,
                     decimals: token.decimals,
                 })));
             } catch (err) {
-                console.error("Failed to load PRC20 tokens", err);
+                console.error("Failed to load moveable tokens", err);
             }
         }
 
         loadMoveableTokens();
         
+    }, [pushChainClient]);
+
+    useEffect(() => {
+        if (!pushChainClient) {
+            setPrc20Tokens([]);
+            return;
+        }
+
+        let cancelled = false;
+        let inFlight = false;
+
+        const loadPrc20Tokens = async () => {
+            try {
+                if (inFlight) return;
+                inFlight = true;
+
+                const account = pushChainClient.universal.account as string | undefined;
+
+                if (!account || !isAddress(account)) {
+                    if (!cancelled) setPrc20Tokens([]);
+                    inFlight = false;
+                    return;
+                }
+
+                const url = `https://donut.push.network/api/v2/addresses/${account}/token-balances`;
+                const res = await fetch(url);
+
+                if (!res.ok) {
+                    if (!cancelled) setPrc20Tokens([]);
+                    inFlight = false;
+                    return;
+                }
+
+                const data = (await res.json()) as Array<{
+                    token?: {
+                        address?: string;
+                        decimals?: string | number | null;
+                        name?: string | null;
+                        symbol?: string | null;
+                        type?: string | null;
+                    } | null;
+                }>;
+
+                const mapped = (Array.isArray(data) ? data : [])
+                    .filter((item) => item?.token?.type === 'ERC-20')
+                    .map((item) => {
+                        const address = item?.token?.address ?? '';
+                        const decimalsRaw = item?.token?.decimals;
+                        const decimals =
+                            typeof decimalsRaw === 'number'
+                                ? decimalsRaw
+                                : typeof decimalsRaw === 'string'
+                                    ? Number(decimalsRaw)
+                                    : 18;
+
+                        return {
+                            name: item?.token?.name ?? '',
+                            symbol: item?.token?.symbol ?? '',
+                            address,
+                            decimals: Number.isFinite(decimals) ? decimals : 18,
+                        } as TokenFormat;
+                    })
+                    .filter((t) => isAddress(t.address as `0x${string}`));
+
+                if (!cancelled) setPrc20Tokens(mapped);
+                inFlight = false;
+            } catch (err) {
+                console.error('Failed to load PRC20 tokens', err);
+                if (!cancelled) setPrc20Tokens([]);
+                inFlight = false;
+            }
+        };
+
+        loadPrc20Tokens();
+        const intervalId = window.setInterval(loadPrc20Tokens, 15_000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+        };
     }, [pushChainClient]);
 
     const fetchTokenDetails = async (address: `0x${string}`): Promise<TokenFormat> => {

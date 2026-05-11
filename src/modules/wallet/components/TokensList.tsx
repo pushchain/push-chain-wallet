@@ -10,6 +10,7 @@ import { convertCaipToObject, getWalletlist } from '../Wallet.utils';
 import { css } from 'styled-components';
 import { PushChain } from '@pushchain/core';
 import { useWalletDashboard } from '../../../context/WalletDashboardContext';
+import { useTokenBalance } from '../../../hooks/useTokenBalance';
 
 type TokensListProps = {
     setActiveState: (activeStates: ActiveStates) => void;
@@ -18,7 +19,7 @@ const TokensList: FC<TokensListProps> = ({
     setActiveState
 }) => {
 
-    const { tokens, moveableTokens } = useTokenManager();
+    const { tokens, moveableTokens, prc20Tokens } = useTokenManager();
     const { state } = useGlobalState();
     const { executorAddress } = usePushChain();
     const { startSendFlow } = useWalletDashboard();
@@ -28,6 +29,18 @@ const TokensList: FC<TokensListProps> = ({
     const parsedWallet = pushWallet?.fullAddress || readOnlyWallet || state?.externalWallet?.originAddress;
 
     const { result } = useMemo(() => convertCaipToObject(parsedWallet), [parsedWallet]);
+
+    const { data: pcBalance } = useTokenBalance('', executorAddress, 18, null);
+    const shouldShowFaucetOnOrigin = !pcBalance || Number(pcBalance) === 0;
+
+    const filteredTokens = useMemo(() => {
+        return tokens.filter((t) => {
+            const addr = (t?.address ?? '').toLowerCase();
+            const existsInMoveable = moveableTokens.some((mt) => (mt?.address ?? '').toLowerCase() === addr);
+            const existsInPrc20 = prc20Tokens.some((pt) => (pt?.address ?? '').toLowerCase() === addr);
+            return !existsInMoveable && !existsInPrc20;
+        });
+    }, [tokens, moveableTokens, prc20Tokens]);
 
     return (
 
@@ -48,13 +61,28 @@ const TokensList: FC<TokensListProps> = ({
                     margin-right: -8px;
                 `}
             >
-                {executorAddress !== result.address && <OriginChainTokenList originWalletAddress={parsedWallet} />}
-                {tokens.map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} walletDetails={result} handleSelectToken={startSendFlow} />
+                {executorAddress !== result.address && (
+                    <OriginChainTokenList
+                        originWalletAddress={parsedWallet}
+                        showFaucet={shouldShowFaucetOnOrigin}
+                    />
+                )}
+                {filteredTokens.map((token: TokenFormat) => (
+                    <TokensListItem
+                        token={token}
+                        key={token.address}
+                        walletDetails={result}
+                        handleSelectToken={startSendFlow}
+                        showFaucet={!shouldShowFaucetOnOrigin && token.symbol === 'PC'}
+                    />
                 ))}
                 {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                 .map((token: TokenFormat) => (
                     <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={startSendFlow} />
+                ))}
+                {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+                .map((token: TokenFormat) => (
+                    <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={startSendFlow} />
                 ))}
             </Box>
             <Box

@@ -18,7 +18,8 @@ export function getChainIcon(chainId, size) {
 
 const OriginChainTokenListItem = ({
     token,
-    walletDetail
+    walletDetail,
+    showFaucet = false
 }) => {
 
     const [balance, setBalance] = useState('0');
@@ -84,27 +85,29 @@ const OriginChainTokenListItem = ({
                         gap="spacing-xxxs"
                     >
                         <Text variant='h6-regular' color='pw-int-text-secondary-color'>
-                            {isLoading ? '0' : `${modifyAddress(balance, 3)} ${token.symbol}`}
+                            {modifyAddress(balance, 3)} {token.symbol}
                         </Text>
-                        <Box
-                            display='flex'
-                            alignItems='center'
-                            borderRadius='radius-xs'
-                            backgroundColor='pw-int-bg-tertiary-color'
-                            padding='spacing-none spacing-xxxs'
-                            gap='spacing-xxxs'
-                            cursor='pointer'
-                            position='relative'
-                            onMouseEnter={() => setFaucetHovered(true)}
-                            onMouseLeave={() => setFaucetHovered(false)}
-                        >
-                            <Faucet size={16} color='pw-int-icon-primary-color' />
-                            {faucetHovered && (
-                                <Text textTransform="capitalize" color="pw-int-text-tertiary-color" css={css`margin-left: 4px;`}>
-                                    Use for Gas
-                                </Text>
-                            )}
-                        </Box>
+                        {showFaucet && (
+                            <Box
+                                display='flex'
+                                alignItems='center'
+                                borderRadius='radius-xs'
+                                backgroundColor='pw-int-bg-tertiary-color'
+                                padding='spacing-none spacing-xxxs'
+                                gap='spacing-xxxs'
+                                cursor='pointer'
+                                position='relative'
+                                onMouseEnter={() => setFaucetHovered(true)}
+                                onMouseLeave={() => setFaucetHovered(false)}
+                            >
+                                <Faucet size={16} color='pw-int-icon-primary-color' />
+                                {faucetHovered && (
+                                    <Text textTransform="capitalize" color="pw-int-text-tertiary-color" css={css`margin-left: 4px;`}>
+                                        Use for Gas
+                                    </Text>
+                                )}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
             </Box>

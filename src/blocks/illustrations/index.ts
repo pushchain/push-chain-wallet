@@ -29,6 +29,8 @@ export { default as CreateChannelPoints } from './components/CreateChannelPoints
 
 export { default as CyberLogoRewards } from './components/CyberLogoRewards';
 
+export { default as DAI } from './components/DAI';
+
 export { default as Discord } from './components/Discord';
 export { default as DiscordSimple } from './components/DiscordSimple';
 
@@ -50,6 +52,10 @@ export { default as GreyBonusActivitySubscribers } from './components/GreyBonusA
 export { default as Linea } from './components/Linea';
 
 export { default as OrangeBonusActivitySubscribers } from './components/OrangeBonusActivitySubscribers';
+
+export { default as PUSD } from './components/PUSD';
+
+export { default as PUSDPlus } from './components/PUSDPlus';
 
 export { default as PushAlpha } from './components/PushAlpha';
 

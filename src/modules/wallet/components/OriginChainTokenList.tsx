@@ -6,9 +6,11 @@ import { css } from 'styled-components';
 import { TOKEN_LISTS } from '../../../helpers/TokenHelper';
 
 const OriginChainTokenList = ({
-    originWalletAddress
+    originWalletAddress,
+    showFaucet
 }: {
     originWalletAddress: string
+    showFaucet?: boolean
 }) => {
 
     const { result } = convertCaipToObject(originWalletAddress);
@@ -43,7 +45,7 @@ const OriginChainTokenList = ({
             <OriginChainWalletHeader />
 
             {tokens && tokens.map((token, id) => (
-                <OriginChainTokenListItem token={token} walletDetail={result} key={id} />
+                <OriginChainTokenListItem token={token} walletDetail={result} key={id} showFaucet={showFaucet} />
             ))}
 
         </Box>

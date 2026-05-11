@@ -5,16 +5,22 @@ import { TokenLogoComponent } from "common";
 import { useTokenBalance } from "../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../context/PushChainContext";
 import { formatTokenValue } from "../Wallet.utils";
+import { Faucet } from "blocks";
+import { css } from "styled-components";
+import { useState } from "react";
 
 type TokenListItemProps = {
   token: TokenFormat;
   walletDetails: WalletType;
   isMoveable?: boolean;
   handleSelectToken?: (token: TokenFormat) => void;
+  showFaucet?: boolean;
 };
 
-const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveable = false, handleSelectToken }) => {
+const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveable = false, handleSelectToken, showFaucet = false }) => {
   const { executorAddress } = usePushChain();
+
+  const [faucetHovered, setFaucetHovered] = useState(false);
 
   const {
     data: tokenBalance,
@@ -43,12 +49,34 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
           <Text variant="bm-semibold" color="pw-int-text-primary-color">
             {token.name}
           </Text>
-          <Text variant="bs-regular" color="pw-int-text-secondary-color">
-            {loadingTokenBalance || !tokenBalance
-              ? '0'
-              : formatTokenValue(tokenBalance, 3)
-            } {token.symbol}
-          </Text>
+          <Box display="flex" gap="spacing-xxxs">
+            <Text variant="bs-regular" color="pw-int-text-secondary-color">
+              {loadingTokenBalance || !tokenBalance
+                ? '0'
+                : formatTokenValue(tokenBalance, 3)
+              } {token.symbol}
+            </Text>
+            {showFaucet && (
+              <Box
+                display='flex'
+                alignItems='center'
+                borderRadius='radius-xs'
+                padding='spacing-none spacing-xxxs'
+                gap='spacing-xxxs'
+                cursor='pointer'
+                position='relative'
+                onMouseEnter={() => setFaucetHovered(true)}
+                onMouseLeave={() => setFaucetHovered(false)}
+              >
+                <Faucet size={16} color='pw-int-icon-primary-color' />
+                {faucetHovered && (
+                  <Text textTransform="capitalize" color="pw-int-text-tertiary-color" css={css`margin-left: 4px;`}>
+                    Use for Gas
+                  </Text>
+                )}
+              </Box>
+            )}
+          </Box>
         </Box>
       </Box>
 
