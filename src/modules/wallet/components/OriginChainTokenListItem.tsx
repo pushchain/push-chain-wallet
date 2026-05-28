@@ -10,7 +10,7 @@ export function getChainIcon(chainId, size) {
     }
     const IconComponent = CHAIN_LOGO?.[chainId];
     if (IconComponent) {
-        return <IconComponent width={size} height={size} color="pw-int-icon-tertiary-color" />;
+        return <IconComponent width={size} height={size} />;
     } else {
         return <PushChainLogo width={size} height={size} />;
     }
@@ -23,19 +23,15 @@ const OriginChainTokenListItem = ({
 }) => {
 
     const [balance, setBalance] = useState('0');
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchBalance = async () => {
             try {
-                setIsLoading(true);
                 const res = await getNativeTokenBalance(token, walletDetail);
                 setBalance(res.balance || '0');
             } catch (error) {
                 console.error("Error fetching balance:", error);
                 setBalance('0');
-            } finally {
-                setIsLoading(false);
             }
         };
 

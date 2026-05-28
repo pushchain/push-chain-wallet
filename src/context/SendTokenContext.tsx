@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from "react";
-import { SendTokenState, TokenFormat } from "../types";
+import { SendTokenState, TokenFormat, WalletType } from "../types";
 import { encodeFunctionData, erc20Abi, parseUnits } from "viem";
 import { usePushChain } from "../context/PushChainContext";
 import { getAppParamValue, WALLET_TO_APP_ACTION } from "common";
 import { useEventEmitterContext } from "./EventEmitterContext";
-import { ExecuteParams } from "@pushchain/core/src/lib/orchestrator/orchestrator.types";
+import {
+  ExecuteParams,
+  UniversalExecuteParams,
+} from "@pushchain/core/src/lib/orchestrator/orchestrator.types";
 import { PushChain } from "@pushchain/core";
+import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
+import type { MoveableToken } from "@pushchain/core/src/lib/constants";
 import { convertCaipToObject, getNativeTokenBalance, getWalletlist } from "../modules/wallet/Wallet.utils";
 import { useGlobalState } from "./GlobalContext";
 import { TOKEN_LISTS } from "../helpers/TokenHelper";
@@ -34,7 +39,66 @@ export interface TokenDetails {
   token: TokenFormat | null;
   chainId?: string;
   native: boolean;
+  source?: 'push' | 'origin' | 'cea';
+  sourceWallet?: WalletType | null;
+  sourceChain?: CHAIN;
+  moveableToken?: MoveableToken;
 }
+
+const PUSH_CHAIN = CHAIN.PUSH_TESTNET_DONUT;
+const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';
+const CHAIN_BY_CHAIN_ID: Record<string, CHAIN> = {
+  '42101': CHAIN.PUSH_TESTNET_DONUT,
+  '11155111': CHAIN.ETHEREUM_SEPOLIA,
+  '84532': CHAIN.BASE_SEPOLIA,
+  '421614': CHAIN.ARBITRUM_SEPOLIA,
+  '97': CHAIN.BNB_TESTNET,
+  EtWTRABZaYq6iMfeYKouRu166VU2xqa1: CHAIN.SOLANA_DEVNET,
+};
+const CHAIN_VALUES = new Set<string>(Object.values(CHAIN));
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
+const getChainFromWalletDetails = (walletDetails?: WalletType | null) => {
+  if (!walletDetails?.chainId) return undefined;
+
+  const caipChain =
+    walletDetails.chain && `${walletDetails.chain}:${walletDetails.chainId}`;
+
+  if (caipChain && CHAIN_VALUES.has(caipChain)) return caipChain as CHAIN;
+
+  return CHAIN_BY_CHAIN_ID[walletDetails.chainId];
+};
+
+const isNativeMoveableToken = (token: MoveableToken) =>
+  token.mechanism === 'native' ||
+  !token.address ||
+  token.address.toLowerCase() === NATIVE_TOKEN_ADDRESS;
+
+const getMoveableTokenForDetails = (
+  details: TokenDetails,
+  sourceChain: CHAIN,
+) => {
+  if (details.moveableToken) return details.moveableToken;
+
+  const moveableTokens = PushChain.utils.tokens.getMoveableTokens(sourceChain)
+    .tokens as MoveableToken[];
+  const selectedToken = details.token;
+
+  if (!selectedToken?.address) {
+    return moveableTokens.find(isNativeMoveableToken);
+  }
+
+  const selectedAddress = selectedToken.address.toLowerCase();
+
+  return (
+    moveableTokens.find(
+      (token) => token.address?.toLowerCase() === selectedAddress,
+    ) ??
+    moveableTokens.find((token) => token.symbol === selectedToken.symbol)
+  );
+};
 
 const SendTokenContext = createContext<SendTokenContextType | undefined>(
   undefined
@@ -70,7 +134,10 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
   const readOnlyWallet = state.pushWallet ? PushChain.utils.account.toChainAgnostic(state.pushWallet.address, { chain: state.pushWallet.chain }) : null;
   const parsedWallet = pushWallet?.fullAddress || readOnlyWallet || state?.externalWallet?.originAddress;
 
-  const { result } = convertCaipToObject(parsedWallet);
+  const { result } = useMemo(
+    () => convertCaipToObject(parsedWallet),
+    [parsedWallet],
+  );
 
   const sendToken = async (token: TokenFormat) => {
     try {
@@ -110,12 +177,12 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
     } catch (error) {
       console.error("Error in sending transaction", error);
-      setTxError(error.message)
+      setTxError(getErrorMessage(error, 'Transaction failed'))
       setSendingTransaction(false);
     }
   }
 
-  const sendNativeToken = async () => {
+  const sendPushNativeToken = async () => {
     try {
       setSendingTransaction(true);
       setTxError('')
@@ -145,15 +212,89 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
     } catch (error) {
       console.error("Error in sending transaction", error);
-      setTxError(error.message)
+      setTxError(getErrorMessage(error, 'Transaction failed'))
+      setSendingTransaction(false);
+    }
+  }
+
+  const sendMoveableTokenToPush = async (source: 'origin' | 'cea') => {
+    try {
+      if (!tokenDetails) {
+        throw new Error('Missing token details.');
+      }
+
+      const sourceChain =
+        tokenDetails.sourceChain ??
+        getChainFromWalletDetails(tokenDetails.sourceWallet ?? result);
+
+      if (!sourceChain || sourceChain === PUSH_CHAIN) {
+        throw new Error('Missing external source chain.');
+      }
+
+      const selectedToken = getMoveableTokenForDetails(
+        tokenDetails,
+        sourceChain,
+      );
+
+      if (!selectedToken) {
+        throw new Error('Unsupported moveable token for selected source chain.');
+      }
+
+      setSendingTransaction(true);
+      setTxError('');
+
+      const value = PushChain.utils.helpers.parseUnits(
+        (amount || '0').toString(),
+        selectedToken.decimals,
+      );
+
+      const payload: UniversalExecuteParams = {
+        ...(source === 'cea' ? { from: { chain: sourceChain } } : {}),
+        to: receiverAddress as `0x${string}`,
+        funds: {
+          amount: value,
+          token: selectedToken,
+        },
+      };
+
+      if (isOpenedInIframe) {
+        sendMessageToMainTab({
+          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
+          data: { ...payload, funds: { ...payload.funds, amount: value.toString() } },
+        });
+
+        return;
+      }
+
+      const receipt = await pushChainClient.universal.sendTransaction(payload);
+
+      if (receipt.hash) {
+        setSendState("confirmation");
+        setTxhash(receipt.hash);
+      }
+      setSendingTransaction(false);
+
+    } catch (error) {
+      console.error("Error in sending moveable token transaction", error);
+      setTxError(getErrorMessage(error, 'Transaction failed'))
       setSendingTransaction(false);
     }
   }
 
   const handleSendTransaction = async () => {
+    if (tokenDetails?.source === 'cea') {
+      sendMoveableTokenToPush('cea');
+      return;
+    }
+
+    if (tokenDetails?.source === 'origin') {
+      sendMoveableTokenToPush('origin');
+      return;
+    }
+
     // if token address is present so it is ERC20 token
-    if (!tokenDetails.token.address) {
-      sendNativeToken();
+    if (!tokenDetails.token?.address) {
+      sendPushNativeToken();
     } else {
       sendToken(tokenDetails.token);
     }
@@ -180,10 +321,18 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
   useEffect(() => {
     const fetchNativeBalance = async () => {
-      if (!!tokenDetails.native && !!tokens[0]) {
+      const balanceToken = tokenDetails?.token ?? tokens?.[0];
+      const balanceWallet = tokenDetails?.sourceWallet ?? result;
+
+      if (!tokenDetails?.native) {
+        setLoadingNativeBalance(false);
+        return;
+      }
+
+      if (balanceToken) {
         try {
           setLoadingNativeBalance(true);
-          const res = await getNativeTokenBalance(tokens[0], result);
+          const res = await getNativeTokenBalance(balanceToken, balanceWallet);
           setNativeBalance(res.balance || '0');
         } catch (error) {
           console.error("Error fetching native balance:", error);
@@ -191,15 +340,24 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         } finally {
           setLoadingNativeBalance(false);
         }
+      } else {
+        setNativeBalance('0');
+        setLoadingNativeBalance(false);
       }
     };
 
     fetchNativeBalance();
-  }, [tokenDetails?.native, tokens]);
+  }, [
+    result,
+    tokenDetails?.native,
+    tokenDetails?.sourceWallet,
+    tokenDetails?.token,
+    tokens,
+  ]);
 
   useEffect(() => {
     if (txhash && sendState !== 'confirmation') setSendState("confirmation");
-  }, [txhash])
+  }, [sendState, txhash])
 
   const value = {
     walletAddress: executorAddress,
@@ -218,7 +376,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     tokenDetails,
     nativeBalance,
     loadingNativeBalance,
-    nativeToken: tokens[0],
+    nativeToken: tokens?.[0] ?? null,
   };
 
   return (

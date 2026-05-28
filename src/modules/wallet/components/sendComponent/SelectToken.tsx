@@ -203,7 +203,15 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                 <OriginChainTokenList
                     originWalletAddress={parsedWallet}
                     hideHeader
-                    handleSelectToken={() => handleTokenSelection({ token: null, chainId: result.chainId, native: true })}
+                    handleSelectToken={(_token, walletDetails) =>
+                        handleTokenSelection({
+                            token: null,
+                            chainId: walletDetails.chainId,
+                            native: true,
+                            source: 'origin',
+                            sourceWallet: walletDetails,
+                        })
+                    }
                 />
             )}
             {otherTokens.map((token: TokenFormat) => (
@@ -211,16 +219,16 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                     token={token}
                     key={token.address}
                     walletDetails={result}
-                    handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false })}
+                    handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false, source: 'push' })}
                 />
             ))}
             {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
               .map((token: TokenFormat) => (
-                  <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => handleTokenSelection({ token, chainId: result.chainId, native: false })} />
+                  <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => handleTokenSelection({ token, chainId: result.chainId, native: false, source: 'origin', sourceWallet: result })} />
             ))}
             {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
               .map((token: TokenFormat) => (
-                  <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false })} />
+                  <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false, source: 'push' })} />
             ))}
             {!loadingTokenDetails && !filteredTokens.length && !searchError && (
               <Text variant="bs-regular" color="pw-int-text-secondary-color">

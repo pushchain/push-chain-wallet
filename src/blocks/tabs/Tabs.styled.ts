@@ -115,8 +115,8 @@ export const StyledLineTab = styled(Tab)`
 export const StyledTabLabel = styled.span`
   white-space: nowrap;
   font-family: var(--pw-int-font-family);
-  font-size: ${textVariants['h5-semibold'].fontSize};
-  font-style: ${textVariants['h5-semibold'].fontStyle};
-  font-weight: ${textVariants['h5-semibold'].fontWeight};
-  line-height: ${textVariants['h5-semibold'].lineHeight};
+  font-size: ${textVariants['bs-semibold'].fontSize};
+  font-style: ${textVariants['bs-semibold'].fontStyle};
+  font-weight: ${textVariants['bs-semibold'].fontWeight};
+  line-height: ${textVariants['bs-semibold'].lineHeight};
 `;

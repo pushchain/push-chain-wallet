@@ -65,7 +65,15 @@ const TokensList: FC<TokensListProps> = ({
                     <OriginChainTokenList
                         originWalletAddress={parsedWallet}
                         showFaucet={shouldShowFaucetOnOrigin}
-                        handleSelectToken={() => startSendFlow({ token: null, chainId: result.chainId, native: true })}
+                        handleSelectToken={(_token, walletDetails) =>
+                            startSendFlow({
+                                token: null,
+                                chainId: walletDetails.chainId,
+                                native: true,
+                                source: 'origin',
+                                sourceWallet: walletDetails,
+                            })
+                        }
                     />
                 )}
                 {filteredTokens.map((token: TokenFormat) => (
@@ -73,17 +81,17 @@ const TokensList: FC<TokensListProps> = ({
                         token={token}
                         key={token.address}
                         walletDetails={result}
-                        handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false })}
+                        handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false, source: 'push' })}
                         showFaucet={!shouldShowFaucetOnOrigin && token.symbol === 'PC'}
                     />
                 ))}
                 {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                     .map((token: TokenFormat) => (
-                        <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => startSendFlow({ token: token, chainId: result.chainId, native: false })} />
+                        <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => startSendFlow({ token: token, chainId: result.chainId, native: false, source: 'origin', sourceWallet: result })} />
                 ))}
                 {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                     .map((token: TokenFormat) => (
-                        <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false })} />
+                        <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false, source: 'push' })} />
                 ))}
             </Box>
             <Box

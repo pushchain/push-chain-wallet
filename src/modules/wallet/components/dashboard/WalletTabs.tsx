@@ -3,13 +3,18 @@ import { Box, Tabs } from "../../../../blocks";
 import { WalletActivityList } from "./WalletActivityList";
 
 import { TokensList } from "../TokensList";
+import { SubAccountsList } from "../SubAccountsList";
 import { ActiveStates, WalletListType } from "../../../../types";
+
+type WalletTabKey = 'tokens' | 'activity' | 'subAccounts' | 'rewards' | 'wallets';
+
+const WALLET_TAB_KEYS: WalletTabKey[] = ['tokens', 'activity', 'subAccounts', 'rewards', 'wallets'];
 
 export type WalletTabsProps = {
   walletList: WalletListType[];
   walletAddress: string;
   selectedWallet: WalletListType;
-  setSelectedWallet: React.Dispatch<React.SetStateAction<WalletListType>>;
+  setSelectedWallet: (wallet: WalletListType) => void;
   setActiveState: (activeStates: ActiveStates) => void;
 };
 
@@ -17,7 +22,13 @@ const WalletTabs: FC<WalletTabsProps> = ({
   walletAddress,
   setActiveState
 }) => {
-  const [activeTab, setActiveTab] = useState<'tokens' | 'activity' | 'rewards' | 'wallets'>('tokens');
+  const [activeTab, setActiveTab] = useState<WalletTabKey>('tokens');
+
+  const handleTabChange = (activeKey: string) => {
+    if (WALLET_TAB_KEYS.includes(activeKey as WalletTabKey)) {
+      setActiveTab(activeKey as WalletTabKey);
+    }
+  };
 
   return (
     <Box height="340px">
@@ -41,24 +52,16 @@ const WalletTabs: FC<WalletTabsProps> = ({
               />
             ),
           },
-          // ...(state.wallet
-          //   ? [
-          //     {
-          //       label: "My Wallets",
-          //       key: "wallets",
-          //       children: (
-          //         <MyWallets
-          //           walletList={walletList}
-          //           setSelectedWallet={setSelectedWallet}
-          //           selectedWallet={selectedWallet}
-          //         />
-          //       ),
-          //     },
-          //   ]
-          //   : []),
+          {
+            label: "Sub-Accounts",
+            key: "subAccounts",
+            children: (
+              <SubAccountsList />
+            ),
+          },
         ]}
         activeKey={activeTab}
-        onChange={(activeKey: 'tokens' | 'activity' | 'rewards' | 'wallets') => setActiveTab(activeKey)}
+        onChange={handleTabChange}
       />
     </Box>
   );

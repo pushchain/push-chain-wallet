@@ -27,20 +27,25 @@ const SelectRecipient = () => {
   const { executorAddress } = usePushChain();
 
   const tokenSelected = tokenDetails.token;
+  const balanceWalletDetails = tokenDetails.sourceWallet ?? null;
+  const balanceWalletAddress = balanceWalletDetails?.address ?? executorAddress;
+  const shouldFetchTokenBalance = !!tokenSelected && !tokenDetails.native;
 
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
   } = useTokenBalance(
     tokenSelected?.address,
-    executorAddress,
+    balanceWalletAddress,
     tokenSelected?.decimals || 18,
-    null
+    balanceWalletDetails,
+    shouldFetchTokenBalance
   );
 
   const balance = tokenDetails.native ? nativeBalance : tokenBalance;
   const loadingBalance = tokenDetails.native ? loadingNativeBalance : loadingTokenBalance;
   const tokenSymbol = tokenSelected?.symbol || nativeToken?.symbol || '';
+  const shouldShowTokenLogo = !tokenDetails.native || !!tokenSelected;
 
   return (
     <>
@@ -78,7 +83,9 @@ const SelectRecipient = () => {
         >
           <Box display="flex" gap="spacing-xxs" alignItems="center">
             {
-              tokenDetails.native ? (
+              shouldShowTokenLogo ? (
+                <TokenLogoComponent tokenSymbol={tokenSelected?.symbol || tokenSymbol} chainId={tokenDetails.chainId} />
+              ) : (
                 <Box position="relative" width="36px" height="36px" display="inline-block">
                   {getChainIcon(tokenDetails.chainId, 36)}
                   <Box
@@ -99,8 +106,6 @@ const SelectRecipient = () => {
                     {getChainIcon(tokenDetails.chainId, 16)}
                   </Box>
                 </Box>
-              ) : (
-                <TokenLogoComponent tokenSymbol={tokenSelected.symbol} chainId={tokenDetails.chainId} />
               )
             }
             <Box display="flex" flexDirection="column">

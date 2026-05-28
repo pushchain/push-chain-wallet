@@ -4,6 +4,7 @@ import { OriginChainTokenListItem } from './OriginChainTokenListItem';
 import { convertCaipToObject } from '../Wallet.utils';
 import { css } from 'styled-components';
 import { TOKEN_LISTS } from '../../../helpers/TokenHelper';
+import { TokenFormat, WalletType } from '../../../types';
 
 const OriginChainTokenList = ({
     originWalletAddress,
@@ -14,7 +15,7 @@ const OriginChainTokenList = ({
     originWalletAddress: string
     showFaucet?: boolean
     hideHeader?: boolean
-    handleSelectToken?: () => void
+    handleSelectToken?: (token: TokenFormat, walletDetails: WalletType) => void
 }) => {
 
     const { result } = convertCaipToObject(originWalletAddress);
@@ -45,7 +46,9 @@ const OriginChainTokenList = ({
             border="border-sm solid pw-int-border-secondary-color"
             padding="spacing-xs"
             backgroundColor="pw-int-bg-tertiary-color"
-            onClick={handleSelectToken}
+            onClick={() => {
+                if (tokens?.[0]) handleSelectToken?.(tokens[0], result);
+            }}
             cursor={handleSelectToken && 'pointer'}
         >
             {!hideHeader && <OriginChainWalletHeader />}

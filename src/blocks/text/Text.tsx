@@ -7,6 +7,19 @@ import { TextAlign, TextHTMLTags, TextResponsiveProps, TextTransform, TextVarian
 import { getVariantStyles } from './Text.utils';
 import { getTextResponsiveCSS } from './Text.utils';
 
+const textStylePropKeys = [
+  'color',
+  'css',
+  'display',
+  'ellipsis',
+  'fullWidth',
+  'numberOfLines',
+  'textAlign',
+  'textTransform',
+  'variant',
+  'wrap',
+];
+
 export type TextProps = {
   /* Sets the html tag for Text component */
   as?: TextHTMLTags;
@@ -34,7 +47,8 @@ export type TextProps = {
   TransformedHTMLAttributes<HTMLParagraphElement | HTMLSpanElement>;
 
 const StyledText = styled.p.withConfig({
-  shouldForwardProp: (prop, defaultValidatorFn) => !['color', 'display'].includes(prop) && defaultValidatorFn(prop),
+  shouldForwardProp: (prop, defaultValidatorFn) =>
+    !textStylePropKeys.includes(prop) && defaultValidatorFn(prop),
 })<TextProps>`
   /* Variant CSS */
   ${({ variant }) => getVariantStyles(variant)}

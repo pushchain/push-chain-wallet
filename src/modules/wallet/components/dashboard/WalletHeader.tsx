@@ -36,6 +36,7 @@ import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { convertCaipToObject } from "../../Wallet.utils";
 import { useWaapAuth } from "../../../../waap/useWaapAuth";
 import { Jazzicon } from "../../../../common/components/JazzIcon";
+import { getAddressExplorerUrl } from "../../../../utils/explorer";
 
 type WalletHeaderProps = {
     walletAddress: string;
@@ -190,10 +191,15 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
 
 export default WalletHeader;
 
-const WalletAddress: FC<{ address: string; chainId: string | number, type: 'executor' | 'origin' }> = ({ address, chainId, type }) => {
+const WalletAddress: FC<{ address: string; chainId: string | number | null, type: 'executor' | 'origin' }> = ({ address, chainId, type }) => {
     const [copied, setCopied] = useState(false);
 
-    const IconComponent = CHAIN_MONOTONE_LOGO[chainId];
+    const resolvedChainId = chainId ?? 42101;
+    const IconComponent = CHAIN_MONOTONE_LOGO[resolvedChainId];
+    const explorerUrl =
+        type === 'origin'
+            ? getAddressExplorerUrl(resolvedChainId, address)
+            : `${EXPLORER_URL}/address/${address}`;
     
     return (
         <AddressRow
@@ -216,7 +222,7 @@ const WalletAddress: FC<{ address: string; chainId: string | number, type: 'exec
                     gap="spacing-xxs"
                     justifyContent="center"
                     alignItems="center"
-                    onClick={() => window.open(`${EXPLORER_URL}/address/${address}`, "_blank")}
+                    onClick={() => window.open(explorerUrl, "_blank")}
                 >
                     <IconComponent size={20} />
                     <Text

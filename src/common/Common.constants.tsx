@@ -55,6 +55,7 @@ import {
   DAI,
   PUSD,
   PUSDPlus,
+  IllustrationProps,
 } from "../blocks";
 import { ChainType, WalletCategoriesType } from "../types/wallet.types";
 
@@ -143,7 +144,7 @@ export const CHAIN_MONOTONE_LOGO: {
 };
 
 export const CHAIN_LOGO: {
-  [x: number | string]: FC<IconProps>;
+  [x: number | string]: FC<IllustrationProps>;
 } = {
   1: Ethereum,
   11155111: Ethereum,
@@ -166,6 +167,9 @@ export const CHAIN_LOGO: {
 };
 
 export const TOKEN_LOGO = {
+  ETH: Ethereum,
+  BNB: BNB,
+  SOL: Solana,
   pETH: Ethereum,
   "pETH.arb": Ethereum,
   "pETH.base": Ethereum,
