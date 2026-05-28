@@ -1,5 +1,4 @@
 import { Box, Button, Text, TextInput } from "blocks";
-import React from "react";
 import { TokenLogoComponent, truncateToDecimals } from "common";
 import { css } from "styled-components";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
@@ -7,37 +6,48 @@ import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 import { useTokenBalance } from "../../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../../context/PushChainContext";
+import { getChainIcon } from "../OriginChainTokenListItem";
 
 const SelectRecipient = () => {
   const {
     walletAddress,
-    tokenSelected,
+    tokenDetails,
     receiverAddress,
     setReceiverAddress,
     amount,
     setAmount,
     setSendState,
-    setTokenSelected,
+    setTokenDetails,
+    nativeToken,
+    nativeBalance,
+    loadingNativeBalance
   } = useSendTokenContext();
 
   const { setActiveState } = useWalletDashboard();
   const { executorAddress } = usePushChain();
 
+  const tokenSelected = tokenDetails.token;
+
   const {
     data: tokenBalance,
     isLoading: loadingTokenBalance
   } = useTokenBalance(
-    tokenSelected.address,
+    tokenSelected?.address,
     executorAddress,
-    tokenSelected.decimals
+    tokenSelected?.decimals || 18,
+    null
   );
+
+  const balance = tokenDetails.native ? nativeBalance : tokenBalance;
+  const loadingBalance = tokenDetails.native ? loadingNativeBalance : loadingTokenBalance;
+  const tokenSymbol = tokenSelected?.symbol || nativeToken?.symbol || '';
 
   return (
     <>
       <WalletHeader
         walletAddress={walletAddress}
         handleBackButton={() => {
-          setTokenSelected(null);
+          setTokenDetails(null);
           setSendState("selectToken");
         }}
       />
@@ -53,7 +63,7 @@ const SelectRecipient = () => {
         `}
       >
         <Text variant="h3-semibold" color="pw-int-text-primary-color">
-          Send {tokenSelected.symbol}{" "}
+          Send {tokenSymbol}{" "}
         </Text>
 
         <Box
@@ -67,13 +77,38 @@ const SelectRecipient = () => {
           cursor="pointer"
         >
           <Box display="flex" gap="spacing-xxs" alignItems="center">
-            <TokenLogoComponent tokenSymbol={tokenSelected.symbol} />
+            {
+              tokenDetails.native ? (
+                <Box position="relative" width="36px" height="36px" display="inline-block">
+                  {getChainIcon(tokenDetails.chainId, 36)}
+                  <Box
+                    position="absolute"
+                    width="18px"
+                    height="18px"
+                    backgroundColor="pw-int-bg-primary-color"
+                    borderRadius="radius-lg"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    border="border-sm solid pw-int-border-secondary-color"
+                    css={css`
+                            bottom: 0;
+                            right: 0;
+                        `}
+                  >
+                    {getChainIcon(tokenDetails.chainId, 16)}
+                  </Box>
+                </Box>
+              ) : (
+                <TokenLogoComponent tokenSymbol={tokenSelected.symbol} chainId={tokenDetails.chainId} />
+              )
+            }
             <Box display="flex" flexDirection="column">
               <Text variant="bm-semibold" color="pw-int-text-primary-color">
-                {tokenSelected.name}
+                {tokenSelected?.name || nativeToken?.name || ''}
               </Text>
               <Text variant="bs-regular" color="pw-int-text-secondary-color">
-                {loadingTokenBalance ? ('0') : Number(truncateToDecimals(Number(tokenBalance ?? '0'), 3)).toLocaleString()} {" "} {tokenSelected.symbol}
+                {loadingBalance ? ('0') : Number(truncateToDecimals(Number(balance ?? '0'), 3)).toLocaleString()} {" "} {tokenSymbol}
               </Text>
             </Box>
           </Box>
@@ -140,7 +175,7 @@ const SelectRecipient = () => {
               alignItems="center"
               backgroundColor="pw-int-bg-secondary-color"
               borderRadius="radius-md"
-              onClick={() => setAmount(truncateToDecimals(Number(tokenBalance), 3).toString())}
+              onClick={() => setAmount(truncateToDecimals(Number(balance), 3).toString())}
               cursor="pointer"
             >
               <Text variant="bs-semibold" color="pw-int-text-primary-color">
@@ -168,7 +203,7 @@ const SelectRecipient = () => {
                 variant="bs-regular"
                 color="pw-int-text-tertiary-color"
               >
-                Balance: {truncateToDecimals(Number(tokenBalance), 3)} {tokenSelected.symbol}
+                Balance: {truncateToDecimals(Number(balance), 3)} {tokenSymbol}
               </Text>
             </Box>
           </Box>
@@ -194,7 +229,7 @@ const SelectRecipient = () => {
           </Button>
           <Button
             onClick={() => {
-              if (receiverAddress && amount && !isNaN(Number(amount)) && Number(amount) > 0 && Number(amount) <= Number(tokenBalance)) {
+              if (receiverAddress && amount && !isNaN(Number(amount)) && Number(amount) > 0 && Number(amount) <= Number(balance)) {
                 setSendState("review");
               }
             }}
@@ -206,7 +241,7 @@ const SelectRecipient = () => {
               !amount ||
               isNaN(Number(amount)) ||
               Number(amount) <= 0 ||
-              Number(amount) > Number(tokenBalance)
+              Number(amount) > Number(balance)
             }
           >
             Next

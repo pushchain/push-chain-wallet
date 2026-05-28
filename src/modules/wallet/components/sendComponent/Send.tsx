@@ -4,14 +4,13 @@ import { SelectToken } from './SelectToken';
 import SelectRecipient from './SelectRecipient';
 import Review from './Review';
 import Confirmation from './Confirmation';
-import { TokenFormat } from '../../../../types';
-import { SendTokenProvider, useSendTokenContext } from '../../../../context/SendTokenContext';
+import { SendTokenProvider, TokenDetails, useSendTokenContext } from '../../../../context/SendTokenContext';
 
 const SendContent = () => {
-    const { sendState, setTokenSelected, setSendState } = useSendTokenContext();
+    const { sendState, setSendState, setTokenDetails } = useSendTokenContext();
 
-    const handleTokenSelection = (token: TokenFormat) => {
-        setTokenSelected(token);
+    const handleTokenSelection = (tokenDetails: TokenDetails) => {
+        setTokenDetails(tokenDetails);
         setSendState('selectRecipient');
     }
 
@@ -32,12 +31,12 @@ const SendContent = () => {
 };
 
 type SendProps = {
-    initialToken?: TokenFormat | null;
+    initialTokenDetails?: TokenDetails | null;
 };
 
-const Send = ({ initialToken }: SendProps) => {
+const Send = ({ initialTokenDetails }: SendProps) => {
     return (
-        <SendTokenProvider initialToken={initialToken}>
+        <SendTokenProvider initialTokenDetails={initialTokenDetails}>
             <SendContent />
         </SendTokenProvider>
     );

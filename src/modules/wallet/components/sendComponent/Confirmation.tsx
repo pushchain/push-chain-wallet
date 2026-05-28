@@ -7,7 +7,7 @@ import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 
 const Confirmation = () => {
-  const { walletAddress, tokenSelected, receiverAddress, amount, txhash, setTxhash } =
+  const { walletAddress, tokenDetails, receiverAddress, amount, txhash, setTxhash, nativeToken } =
     useSendTokenContext();
   const { setActiveState, selectedNetwork } =
     useWalletDashboard();
@@ -82,7 +82,7 @@ const Confirmation = () => {
                 color="pw-int-icon-danger-bold-color"
               />}
               <Text variant="h2-semibold" color="pw-int-text-primary-color">
-                {Number(amount) || amount} {tokenSelected.symbol}
+                {Number(amount) || amount} {tokenDetails.token?.symbol || nativeToken?.symbol || ''}
               </Text>
             </Box>
             {/* <Text color="pw-int-text-secondary-color" variant="bs-regular">

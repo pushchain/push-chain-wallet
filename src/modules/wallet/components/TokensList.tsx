@@ -65,6 +65,7 @@ const TokensList: FC<TokensListProps> = ({
                     <OriginChainTokenList
                         originWalletAddress={parsedWallet}
                         showFaucet={shouldShowFaucetOnOrigin}
+                        handleSelectToken={() => startSendFlow({ token: null, chainId: result.chainId, native: true })}
                     />
                 )}
                 {filteredTokens.map((token: TokenFormat) => (
@@ -72,17 +73,17 @@ const TokensList: FC<TokensListProps> = ({
                         token={token}
                         key={token.address}
                         walletDetails={result}
-                        handleSelectToken={startSendFlow}
+                        handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false })}
                         showFaucet={!shouldShowFaucetOnOrigin && token.symbol === 'PC'}
                     />
                 ))}
                 {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
-                .map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={startSendFlow} />
+                    .map((token: TokenFormat) => (
+                        <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => startSendFlow({ token: token, chainId: result.chainId, native: false })} />
                 ))}
                 {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
-                .map((token: TokenFormat) => (
-                    <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={startSendFlow} />
+                    .map((token: TokenFormat) => (
+                        <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false })} />
                 ))}
             </Box>
             <Box

@@ -19,7 +19,7 @@ export function getChainIcon(chainId, size) {
 const OriginChainTokenListItem = ({
     token,
     walletDetail,
-    showFaucet = false
+    showFaucet = false,
 }) => {
 
     const [balance, setBalance] = useState('0');
@@ -54,6 +54,7 @@ const OriginChainTokenListItem = ({
             <Box
                 display='flex'
                 gap="spacing-xxs"
+                alignItems='center'
             >
                 <Box position="relative" width="36px" height="36px" display="inline-block">
                     {getChainIcon(walletDetail.chainId, 36)}

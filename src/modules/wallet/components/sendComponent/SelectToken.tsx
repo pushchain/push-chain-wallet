@@ -3,15 +3,20 @@ import React, { FC, useMemo, useState } from "react";
 import { css } from "styled-components";
 import { TokenFormat } from "../../../../types";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
-import { useSendTokenContext } from "../../../../context/SendTokenContext";
+import { TokenDetails, useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 import { useTokenManager } from "../../../../hooks/useTokenManager";
 import { TokensListItem } from "../TokensListItem";
 import { isAddress } from "viem";
 import { truncateWords } from "common";
+import { useGlobalState } from "../../../../context/GlobalContext";
+import { convertCaipToObject, getWalletlist } from "../../Wallet.utils";
+import { PushChain } from "@pushchain/core";
+import OriginChainTokenList from "../OriginChainTokenList";
+import { usePushChain } from "../../../../context/PushChainContext";
 
 type SelectTokenProps = {
-  handleTokenSelection: (token: TokenFormat) => void;
+  handleTokenSelection: (tokenDetails: TokenDetails) => void;
 };
 const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,8 +26,16 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
   const { setActiveState } = useWalletDashboard();
 
   const { walletAddress } = useSendTokenContext();
+  const { state } = useGlobalState();
+  const { executorAddress } = usePushChain();
 
-  const { tokens, prc20Tokens, fetchTokenDetails } = useTokenManager();
+  const { tokens, prc20Tokens, moveableTokens, fetchTokenDetails } = useTokenManager();
+
+  const pushWallet = useMemo(() => getWalletlist(state.wallet)[0], [state.wallet]);
+  const readOnlyWallet = state.pushWallet ? PushChain.utils.account.toChainAgnostic(state.pushWallet.address, { chain: state.pushWallet.chain }) : null;
+  const parsedWallet = pushWallet?.fullAddress || readOnlyWallet || state?.externalWallet?.originAddress;
+
+  const { result } = useMemo(() => convertCaipToObject(parsedWallet), [parsedWallet]);
 
   const availableTokens = useMemo(() => {
     const dedupedTokens = new Map<string, TokenFormat>();
@@ -38,10 +51,14 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
     return Array.from(dedupedTokens.values());
   }, [tokens, prc20Tokens]);
 
-  const prc20TokenAddresses = useMemo(
-    () => new Set(prc20Tokens.map((token) => token.address.toLowerCase())),
-    [prc20Tokens]
-  );
+  const otherTokens = useMemo(() => {
+      return tokens.filter((t) => {
+          const addr = (t?.address ?? '').toLowerCase();
+          const existsInMoveable = moveableTokens.some((mt) => (mt?.address ?? '').toLowerCase() === addr);
+          const existsInPrc20 = prc20Tokens.some((pt) => (pt?.address ?? '').toLowerCase() === addr);
+          return !existsInMoveable && !existsInPrc20;
+      });
+  }, [tokens, moveableTokens, prc20Tokens]);
 
   const filteredTokens = useMemo(() => {
     const trimmedQuery = searchQuery.trim().toLowerCase();
@@ -171,17 +188,39 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
             flexDirection="column"
             gap="spacing-xs"
             overflow="hidden scroll"
-            height="240px"
+            height="318px"
             customScrollbar
           >
             {loadingTokenDetails && <Spinner size="large" variant="primary" />}
-            {filteredTokens.map((token: TokenFormat) => (
+            {/* {filteredTokens.map((token: TokenFormat) => (
               <TokensListItem
                 token={token}
                 key={token.address || token.symbol}
                 handleSelectToken={handleTokenSelection}
-                isPrc20={prc20TokenAddresses.has(token.address.toLowerCase())}
               />
+            ))} */}
+            {executorAddress !== result.address && (
+                <OriginChainTokenList
+                    originWalletAddress={parsedWallet}
+                    hideHeader
+                    handleSelectToken={() => handleTokenSelection({ token: null, chainId: result.chainId, native: true })}
+                />
+            )}
+            {otherTokens.map((token: TokenFormat) => (
+                <TokensListItem
+                    token={token}
+                    key={token.address}
+                    walletDetails={result}
+                    handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false })}
+                />
+            ))}
+            {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+              .map((token: TokenFormat) => (
+                  <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => handleTokenSelection({ token, chainId: result.chainId, native: false })} />
+            ))}
+            {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+              .map((token: TokenFormat) => (
+                  <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false })} />
             ))}
             {!loadingTokenDetails && !filteredTokens.length && !searchError && (
               <Text variant="bs-regular" color="pw-int-text-secondary-color">

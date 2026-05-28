@@ -214,11 +214,27 @@ export async function getNativeTokenBalance(token, walletDetail): Promise<{ bala
   }
 }
 
-export function formatTokenValue(value: string | number | bigint, decimalPlaces: number = 3): string {
+export function formatTokenValue(
+  value: string | number | bigint,
+  decimalPlaces: number = 3
+): string {
   const num = typeof value === 'bigint' ? Number(value) : Number(value);
+
   if (isNaN(num)) return String(value);
-  // if (Math.abs(num) >= 100000) {
-  //   return num.toExponential(2);
-  // }
-  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimalPlaces });
+  if (num === 0) return '0';
+
+  let maxFractionDigits = decimalPlaces;
+
+  // If rounded value becomes 0, increase decimals until first non-zero digit
+  while (
+    maxFractionDigits < 18 &&
+    Number(num.toFixed(maxFractionDigits)) === 0
+  ) {
+    maxFractionDigits++;
+  }
+
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxFractionDigits,
+  });
 }

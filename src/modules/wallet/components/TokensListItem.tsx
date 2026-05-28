@@ -13,7 +13,7 @@ type TokenListItemProps = {
   token: TokenFormat;
   walletDetails: WalletType;
   isMoveable?: boolean;
-  handleSelectToken?: (token: TokenFormat) => void;
+  handleSelectToken?: () => void;
   showFaucet?: boolean;
 };
 
@@ -40,7 +40,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
       alignItems="center"
       borderRadius="radius-sm"
       border="border-sm solid pw-int-border-secondary-color"
-      onClick={() => handleSelectToken?.(token)}
+      onClick={handleSelectToken}
       cursor={handleSelectToken && 'pointer'}
     >
       <Box display="flex" gap="spacing-xxs" alignItems="center">

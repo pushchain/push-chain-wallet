@@ -7,10 +7,14 @@ import { TOKEN_LISTS } from '../../../helpers/TokenHelper';
 
 const OriginChainTokenList = ({
     originWalletAddress,
-    showFaucet
+    showFaucet,
+    hideHeader,
+    handleSelectToken
 }: {
     originWalletAddress: string
     showFaucet?: boolean
+    hideHeader?: boolean
+    handleSelectToken?: () => void
 }) => {
 
     const { result } = convertCaipToObject(originWalletAddress);
@@ -41,8 +45,10 @@ const OriginChainTokenList = ({
             border="border-sm solid pw-int-border-secondary-color"
             padding="spacing-xs"
             backgroundColor="pw-int-bg-tertiary-color"
+            onClick={handleSelectToken}
+            cursor={handleSelectToken && 'pointer'}
         >
-            <OriginChainWalletHeader />
+            {!hideHeader && <OriginChainWalletHeader />}
 
             {tokens && tokens.map((token, id) => (
                 <OriginChainTokenListItem token={token} walletDetail={result} key={id} showFaucet={showFaucet} />

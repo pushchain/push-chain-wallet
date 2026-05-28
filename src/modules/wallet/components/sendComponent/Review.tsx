@@ -10,13 +10,14 @@ import { fetchGasPriceInGwei } from '../../../../utils/viemClient';
 const Review = () => {
   const {
     walletAddress,
-    tokenSelected,
+    tokenDetails,
     receiverAddress,
     amount,
     handleSendTransaction,
     sendingTransaction,
     setSendState,
     txError,
+    nativeToken
   } = useSendTokenContext();
 
   const { selectedNetwork } = useWalletDashboard();
@@ -104,7 +105,7 @@ const Review = () => {
             >
               <SendNotification size={48} color="pw-int-icon-brand-color" />
               <Text variant="h2-semibold" color="pw-int-text-primary-color">
-                {Number(amount) || amount} {tokenSelected.symbol}
+                {Number(amount) || amount} {tokenDetails.token?.symbol || nativeToken?.symbol || ''}
               </Text>
             </Box>
             {/* <Text color="pw-int-text-secondary-color" variant="bs-regular">

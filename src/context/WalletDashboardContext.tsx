@@ -1,5 +1,6 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { ActiveStates, PushNetworks, TokenFormat, WalletListType } from '../types';
+import { ActiveStates, PushNetworks, WalletListType } from '../types';
+import { TokenDetails } from './SendTokenContext';
 
 interface WalletDashboardContextType {
     selectedWallet: WalletListType | undefined;
@@ -8,24 +9,15 @@ interface WalletDashboardContextType {
     setConnectionSuccess: (show: boolean) => void;
     activeState: ActiveStates;
     setActiveState: (state: ActiveStates) => void;
-    startSendFlow: (token?: TokenFormat | null) => void;
+    startSendFlow: (tokenDetails?: TokenDetails) => void;
     selectedNetwork: PushNetworks;
     setSelectedNetwork: (network: PushNetworks) => void;
 }
 
 const WalletDashboardContext = createContext<WalletDashboardContextType | undefined>(undefined);
 
-interface WalletProviderProps {
+interface WalletProviderProps extends WalletDashboardContextType {
     children: ReactNode;
-    selectedWallet: WalletListType | undefined;
-    setSelectedWallet: (wallet: WalletListType) => void;
-    showConnectionSuccess: boolean;
-    setConnectionSuccess: (show: boolean) => void;
-    activeState: ActiveStates;
-    setActiveState: (state: ActiveStates) => void;
-    startSendFlow: (token?: TokenFormat | null) => void;
-    selectedNetwork: PushNetworks;
-    setSelectedNetwork: (network: PushNetworks) => void;
 }
 
 export const WalletDashboardProvider = ({
