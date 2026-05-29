@@ -202,6 +202,7 @@ const buildSubAccount = async (
 const SubAccountsList: FC = () => {
     const { pushChainClient } = usePushChain();
     const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
+    const [expandedChain, setExpandedChain] = useState<CHAIN | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -219,6 +220,7 @@ const SubAccountsList: FC = () => {
         const loadSubAccounts = async (showLoading = false) => {
             if (!pushChainClient) {
                 setSubAccounts([]);
+                setExpandedChain(null);
                 setError('');
                 return;
             }
@@ -266,6 +268,15 @@ const SubAccountsList: FC = () => {
         };
     }, [pushChainClient, supportedSubAccountChains]);
 
+    useEffect(() => {
+        if (
+            expandedChain &&
+            !subAccounts.some((subAccount) => subAccount.chain === expandedChain)
+        ) {
+            setExpandedChain(null);
+        }
+    }, [expandedChain, subAccounts]);
+
     if (isLoading && !subAccounts.length) {
         return <SubAccountsSkeleton />;
     }
@@ -304,6 +315,14 @@ const SubAccountsList: FC = () => {
                         <SubAccountCard
                             key={subAccount.chain}
                             subAccount={subAccount}
+                            expanded={expandedChain === subAccount.chain}
+                            onToggle={() =>
+                                setExpandedChain((currentChain) =>
+                                    currentChain === subAccount.chain
+                                        ? null
+                                        : subAccount.chain,
+                                )
+                            }
                         />
                     ))}
                 </>
@@ -342,15 +361,22 @@ const SubAccountsStateLabel = ({ label }: { label: string }) => (
     </Box>
 );
 
-const SubAccountCard = ({ subAccount }: { subAccount: SubAccount }) => {
-    const [expanded, setExpanded] = useState(false);
+const SubAccountCard = ({
+    subAccount,
+    expanded,
+    onToggle,
+}: {
+    subAccount: SubAccount;
+    expanded: boolean;
+    onToggle: () => void;
+}) => {
     const [copied, setCopied] = useState(false);
     const { startSendFlow } = useWalletDashboard();
 
     const IconComponent = CHAIN_MONOTONE_LOGO[subAccount.chainId];
 
     const handleToggle = () => {
-        setExpanded((current) => !current);
+        onToggle();
     };
 
     const handleCopyClick = (event: React.MouseEvent) => {
