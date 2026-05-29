@@ -277,10 +277,6 @@ const SubAccountsList: FC = () => {
         }
     }, [expandedChain, subAccounts]);
 
-    if (isLoading && !subAccounts.length) {
-        return <SubAccountsSkeleton />;
-    }
-
     return (
         <Box
             display="flex"
@@ -296,42 +292,46 @@ const SubAccountsList: FC = () => {
                 margin-right: -8px;
             `}
         >
-            {error ? (
+            <SubAccountsDescription />
+            {isLoading && !subAccounts.length ? (
+                <SubAccountsSkeleton />
+            ) : error ? (
                 <SubAccountsStateLabel label={error} />
             ) : subAccounts.length ? (
-                <>
-                    <Text
-                        variant="c-regular"
-                        color="pw-int-text-tertiary-color"
-                        wrap
-                        css={css`
-                            flex: 0 0 auto;
-                        `}
-                    >
-                        Smart sub-accounts linked to your Push wallet to hold
-                        assets and execute transactions across different chains.
-                    </Text>
-                    {subAccounts.map((subAccount) => (
-                        <SubAccountCard
-                            key={subAccount.chain}
-                            subAccount={subAccount}
-                            expanded={expandedChain === subAccount.chain}
-                            onToggle={() =>
-                                setExpandedChain((currentChain) =>
-                                    currentChain === subAccount.chain
-                                        ? null
-                                        : subAccount.chain,
-                                )
-                            }
-                        />
-                    ))}
-                </>
+                subAccounts.map((subAccount) => (
+                    <SubAccountCard
+                        key={subAccount.chain}
+                        subAccount={subAccount}
+                        expanded={expandedChain === subAccount.chain}
+                        onToggle={() =>
+                            setExpandedChain((currentChain) =>
+                                currentChain === subAccount.chain
+                                    ? null
+                                    : subAccount.chain,
+                            )
+                        }
+                    />
+                ))
             ) : (
                 <SubAccountsStateLabel label="No sub-account balances" />
             )}
         </Box>
     );
 };
+
+const SubAccountsDescription = () => (
+    <Text
+        variant="c-regular"
+        color="pw-int-text-tertiary-color"
+        wrap
+        css={css`
+            flex: 0 0 auto;
+        `}
+    >
+        Smart sub-accounts linked to your Push wallet to hold assets and execute
+        transactions across different chains.
+    </Text>
+);
 
 const SubAccountsSkeleton = () => (
     <Box display="flex" flexDirection="column" gap="spacing-xs">
