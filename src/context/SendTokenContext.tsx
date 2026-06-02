@@ -169,9 +169,9 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
       const receipt = await pushChainClient.universal.sendTransaction(payload);
 
-      if (receipt.hash) {
+      if (receipt.finalTxHash) {
         setSendState("confirmation");
-        setTxhash(receipt.hash);
+        setTxhash(receipt.finalTxHash);
       }
       setSendingTransaction(false);
 
@@ -204,9 +204,9 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
       const receipt = await pushChainClient.universal.sendTransaction(payload);
 
-      if (receipt.hash) {
+      if (receipt.finalTxHash) {
         setSendState("confirmation");
-        setTxhash(receipt.hash);
+        setTxhash(receipt.finalTxHash);
       }
       setSendingTransaction(false);
 
@@ -268,9 +268,9 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
       const receipt = await pushChainClient.universal.sendTransaction(payload);
 
-      if (receipt.hash) {
+      if (receipt.finalTxHash) {
         setSendState("confirmation");
-        setTxhash(receipt.hash);
+        setTxhash(receipt.finalTxHash);
       }
       setSendingTransaction(false);
 

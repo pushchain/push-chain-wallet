@@ -305,6 +305,11 @@ const Wallet: FC<WalletProps> = () => {
       />
     );
 
+    console.log(pushChainClient?.universal.trackTransaction("0x9b4743376689eb6f90f3aeb9eea58381b3bcc033e1de4709281fd58a77b85098", {
+      progressHook: (progress) => {        console.log("Tx Progress: ", progress);
+      }
+    }))
+
   return (
     <ContentLayout>
       <BoxLayout>
