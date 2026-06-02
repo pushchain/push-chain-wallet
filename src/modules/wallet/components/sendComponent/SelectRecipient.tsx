@@ -29,7 +29,8 @@ const SelectRecipient = () => {
   const tokenSelected = tokenDetails.token;
   const balanceWalletDetails = tokenDetails.sourceWallet ?? null;
   const balanceWalletAddress = balanceWalletDetails?.address ?? executorAddress;
-  const shouldFetchTokenBalance = !!tokenSelected && !tokenDetails.native;
+  const hasLoadedTokenBalance = tokenSelected?.balance !== undefined;
+  const shouldFetchTokenBalance = !!tokenSelected && !tokenDetails.native && !hasLoadedTokenBalance;
 
   const {
     data: tokenBalance,
@@ -42,8 +43,8 @@ const SelectRecipient = () => {
     shouldFetchTokenBalance
   );
 
-  const balance = tokenDetails.native ? nativeBalance : tokenBalance;
-  const loadingBalance = tokenDetails.native ? loadingNativeBalance : loadingTokenBalance;
+  const balance = tokenDetails.native ? nativeBalance : hasLoadedTokenBalance ? tokenSelected?.balance : tokenBalance;
+  const loadingBalance = tokenDetails.native ? loadingNativeBalance : hasLoadedTokenBalance ? false : loadingTokenBalance;
   const tokenSymbol = tokenSelected?.symbol || nativeToken?.symbol || '';
   const shouldShowTokenLogo = !tokenDetails.native || !!tokenSelected;
 

@@ -85,12 +85,6 @@ export const fetchTokenBalance = async ({
         }
 
         if (!walletDetails) {
-            const contractCode = await viemClient.getCode({
-                address: tokenAddress as `0x${string}`,
-            });
-
-            if (!contractCode || contractCode === '0x') return '0';
-
             const balanceParams = {
                 address: tokenAddress as `0x${string}`,
                 abi: erc20Abi,
@@ -140,12 +134,6 @@ export const fetchTokenBalance = async ({
                 retryDelay: 30_000,
             })
         });
-
-        const contractCode = await client.getCode({
-            address: tokenAddress as `0x${string}`,
-        });
-
-        if (!contractCode || contractCode === '0x') return '0';
 
         const balanceParams = {
             address: tokenAddress as `0x${string}`,

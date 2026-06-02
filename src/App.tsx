@@ -34,13 +34,13 @@ const themeConfig = {
   light: { blocksTheme: blocksTheme.light, scheme: "light" },
 };
 
+const queryClient = new QueryClient();
+
 export default function App() {
   const { isDarkMode } = useDarkMode();
 
   const { state } = useAppState();
   startEIP6963Listener();
-
-  const queryClient = new QueryClient();
 
   const isOpenedInIframe = !!getAppParamValue();
 

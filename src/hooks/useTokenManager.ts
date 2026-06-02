@@ -1,7 +1,7 @@
 import { ERC20ABI } from 'common';
 import { useEffect, useState } from 'react';
 import { TokenFormat } from '../types';
-import { isAddress } from 'viem';
+import { formatUnits, isAddress } from 'viem';
 import { viemClient } from '../utils/viemClient';
 import { PushChain } from '@pushchain/core';
 import { usePushChain } from '../context/PushChainContext';
@@ -12,6 +12,26 @@ const DEFAULT_TOKEN = {
     symbol: 'PC',
     address: '',
     decimals: 18,
+};
+
+const PRC20_TOKEN_ADDRESSES = new Set(
+    PRC20_TOKENS.map((token) => token.prc20Address.trim().toLowerCase())
+);
+
+const formatBlockscoutBalance = (value: string | number | null | undefined, decimals: number) => {
+    const rawBalance = value == null ? '0' : String(value);
+
+    if (!/^\d+$/.test(rawBalance)) {
+        return {
+            balance: '0',
+            rawBalance: '0',
+        };
+    }
+
+    return {
+        balance: formatUnits(BigInt(rawBalance), decimals),
+        rawBalance,
+    };
 };
 
 export function useTokenManager() {
@@ -99,12 +119,16 @@ export function useTokenManager() {
                         symbol?: string | null;
                         type?: string | null;
                     } | null;
+                    value?: string | number | null;
                 }>;
 
                 const mapped = (Array.isArray(data) ? data : [])
-                    .filter((item) => PRC20_TOKENS.some((token) => token.prc20Address === item?.token?.address))
+                    .filter((item) => {
+                        const address = item?.token?.address?.trim().toLowerCase();
+                        return !!address && PRC20_TOKEN_ADDRESSES.has(address);
+                    })
                     .map((item) => {
-                        const address = item?.token?.address ?? '';
+                        const address = item?.token?.address?.trim() ?? '';
                         const decimalsRaw = item?.token?.decimals;
                         const decimals =
                             typeof decimalsRaw === 'number'
@@ -112,12 +136,16 @@ export function useTokenManager() {
                                 : typeof decimalsRaw === 'string'
                                     ? Number(decimalsRaw)
                                     : 18;
+                        const normalizedDecimals = Number.isFinite(decimals) ? decimals : 18;
+                        const { balance, rawBalance } = formatBlockscoutBalance(item?.value, normalizedDecimals);
 
                         return {
                             name: item?.token?.name ?? '',
                             symbol: item?.token?.symbol ?? '',
                             address,
-                            decimals: Number.isFinite(decimals) ? decimals : 18,
+                            decimals: normalizedDecimals,
+                            balance,
+                            rawBalance,
                         } as TokenFormat;
                     })
                     .filter((t) => isAddress(t.address as `0x${string}`));

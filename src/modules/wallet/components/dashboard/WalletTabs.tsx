@@ -38,25 +38,29 @@ const WalletTabs: FC<WalletTabsProps> = ({
             label: "Tokens",
             key: "tokens",
             children: (
-              <TokensList setActiveState={setActiveState} />
+              activeTab === 'tokens' ? (
+                <TokensList setActiveState={setActiveState} />
+              ) : null
             )
           },
           {
             label: "Activity",
             key: "activity",
             children: (
-              <WalletActivityList
-                address={
-                  walletAddress
-                }
-              />
+              activeTab === 'activity' ? (
+                <WalletActivityList
+                  address={
+                    walletAddress
+                  }
+                />
+              ) : null
             ),
           },
           {
             label: "Sub-Accounts",
             key: "subAccounts",
             children: (
-              <SubAccountsList />
+              activeTab === 'subAccounts' ? <SubAccountsList /> : null
             ),
           },
         ]}

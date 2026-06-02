@@ -6,7 +6,9 @@ export type TokenFormat = {
     name: string;
     symbol: string;
     address: string;
-    decimals: number
+    decimals: number;
+    balance?: string;
+    rawBalance?: string;
 }
 
 export type WalletListType = {

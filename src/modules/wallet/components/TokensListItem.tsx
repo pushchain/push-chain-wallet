@@ -11,7 +11,7 @@ import { useState } from "react";
 
 type TokenListItemProps = {
   token: TokenFormat;
-  walletDetails: WalletType;
+  walletDetails: WalletType | null;
   isMoveable?: boolean;
   handleSelectToken?: () => void;
   showFaucet?: boolean;
@@ -21,11 +21,15 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
   const { executorAddress } = usePushChain();
 
   const [faucetHovered, setFaucetHovered] = useState(false);
+  const shouldFetchTokenBalance = token.balance === undefined;
 
   const {
-    data: tokenBalance,
-    isLoading: loadingTokenBalance
-  } = useTokenBalance(token.address, executorAddress, token.decimals, isMoveable ? walletDetails : null);
+    data: fetchedTokenBalance,
+    isLoading: fetchingTokenBalance
+  } = useTokenBalance(token.address, executorAddress, token.decimals, isMoveable ? walletDetails : null, shouldFetchTokenBalance);
+
+  const tokenBalance = shouldFetchTokenBalance ? fetchedTokenBalance : token.balance;
+  const loadingTokenBalance = shouldFetchTokenBalance ? fetchingTokenBalance : false;
 
   if (!tokenBalance || tokenBalance === '0') {
     return null;
@@ -44,7 +48,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
       cursor={handleSelectToken && 'pointer'}
     >
       <Box display="flex" gap="spacing-xxs" alignItems="center">
-        <TokenLogoComponent tokenSymbol={token.symbol} chainId={isMoveable ? walletDetails.chainId : null} />
+        <TokenLogoComponent tokenSymbol={token.symbol} chainId={isMoveable ? walletDetails?.chainId : null} />
         <Box display="flex" flexDirection="column">
           <Text variant="bm-semibold" color="pw-int-text-primary-color">
             {token.name}
