@@ -41,6 +41,7 @@ const IconWrapper: FC<IconWrapperProps> = ({
   componentName,
   icon,
   size: sizeProp,
+  style,
   ...restProps
 }) => {
   const color = colorProp ? `var(--${colorProp})` : "currentColor";
@@ -52,6 +53,12 @@ const IconWrapper: FC<IconWrapperProps> = ({
       color={color}
       role="img"
       size={size}
+      style={{
+        color,
+        height: size,
+        width: size,
+        ...style,
+      }}
       {...restProps}
     >
       {icon}

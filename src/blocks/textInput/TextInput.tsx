@@ -41,7 +41,7 @@ const StyledTextInput = styled.div<{
     return css`
       align-self: stretch;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       border-radius: var(--radius-xs, 12px);
       border: 1.5px solid var(--pw-int-${error ? 'error-primary-color' : 'border-secondary-color'});
       background: var(--pw-int-bg-tertiary-color);

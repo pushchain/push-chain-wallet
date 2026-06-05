@@ -4,7 +4,6 @@ import { centerMaskWalletAddress, truncateWords } from "common";
 import { css } from "styled-components";
 import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
-import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { fetchGasPriceInGwei } from '../../../../utils/viemClient';
 
 const Review = () => {
@@ -17,10 +16,10 @@ const Review = () => {
     sendingTransaction,
     setSendState,
     txError,
-    nativeToken
+    nativeToken,
+    selectedDestinationNetwork
   } = useSendTokenContext();
 
-  const { selectedNetwork } = useWalletDashboard();
   const [networkFee, setNetworkFee] = React.useState<string | null>(null);
   const [feeLoading, setFeeLoading] = React.useState<boolean>(true);
   const [feeError, setFeeError] = React.useState<string | null>(null);
@@ -146,7 +145,7 @@ const Review = () => {
               <Text color="pw-int-text-tertiary-color" variant="bs-regular">
                 Network
               </Text>
-              <Text variant="bs-regular">{selectedNetwork}</Text>
+              <Text variant="bs-regular">{selectedDestinationNetwork.label}</Text>
             </Box>
             <Box
               display="flex"

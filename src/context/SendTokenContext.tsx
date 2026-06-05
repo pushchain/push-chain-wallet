@@ -10,10 +10,11 @@ import {
 } from "@pushchain/core/src/lib/orchestrator/orchestrator.types";
 import { PushChain } from "@pushchain/core";
 import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
-import type { MoveableToken } from "@pushchain/core/src/lib/constants";
+import type { MoveableToken, PushChainMoveableToken } from "@pushchain/core/src/lib/constants";
 import { convertCaipToObject, getNativeTokenBalance, getWalletlist } from "../modules/wallet/Wallet.utils";
 import { useGlobalState } from "./GlobalContext";
 import { TOKEN_LISTS } from "../helpers/TokenHelper";
+import { PRC20_TOKENS } from "../constants";
 
 interface SendTokenContextType {
   walletAddress: string;
@@ -25,6 +26,11 @@ interface SendTokenContextType {
   setAmount: (amount: string) => void;
   sendingTransaction: boolean;
   handleSendTransaction: () => void;
+  destinationNetwork: DestinationNetwork;
+  setDestinationNetwork: React.Dispatch<React.SetStateAction<DestinationNetwork>>;
+  destinationNetworkOptions: DestinationNetworkOption[];
+  selectedDestinationNetwork: DestinationNetworkOption;
+  canSelectDestinationNetwork: boolean;
   txhash: string | null;
   txError: string,
   setTxhash: React.Dispatch<React.SetStateAction<string>>;
@@ -34,6 +40,15 @@ interface SendTokenContextType {
   loadingNativeBalance: boolean;
   nativeToken: TokenFormat | null;
 }
+
+export type DestinationNetwork = 'push' | 'connected';
+
+export type DestinationNetworkOption = {
+  value: DestinationNetwork;
+  label: string;
+  chain: CHAIN;
+  chainId: string | null;
+};
 
 export interface TokenDetails {
   token: TokenFormat | null;
@@ -47,6 +62,12 @@ export interface TokenDetails {
 
 const PUSH_CHAIN = CHAIN.PUSH_TESTNET_DONUT;
 const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';
+const PUSH_DESTINATION_OPTION: DestinationNetworkOption = {
+  value: 'push',
+  label: 'Push Chain',
+  chain: PUSH_CHAIN,
+  chainId: '42101',
+};
 const CHAIN_BY_CHAIN_ID: Record<string, CHAIN> = {
   '42101': CHAIN.PUSH_TESTNET_DONUT,
   '11155111': CHAIN.ETHEREUM_SEPOLIA,
@@ -56,6 +77,19 @@ const CHAIN_BY_CHAIN_ID: Record<string, CHAIN> = {
   EtWTRABZaYq6iMfeYKouRu166VU2xqa1: CHAIN.SOLANA_DEVNET,
 };
 const CHAIN_VALUES = new Set<string>(Object.values(CHAIN));
+const CHAIN_LABELS: Partial<Record<CHAIN, string>> = {
+  [CHAIN.PUSH_TESTNET_DONUT]: 'Push Chain',
+  [CHAIN.ETHEREUM_SEPOLIA]: 'Ethereum Sepolia',
+  [CHAIN.BASE_SEPOLIA]: 'Base Sepolia',
+  [CHAIN.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
+  [CHAIN.BNB_TESTNET]: 'BNB Chain',
+  [CHAIN.SOLANA_DEVNET]: 'Solana',
+};
+
+type PushMoveableToken = PushChainMoveableToken & {
+  chain?: CHAIN;
+  chainName?: string;
+};
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
@@ -75,6 +109,73 @@ const isNativeMoveableToken = (token: MoveableToken) =>
   token.mechanism === 'native' ||
   !token.address ||
   token.address.toLowerCase() === NATIVE_TOKEN_ADDRESS;
+
+const getChainIdFromChain = (chain?: CHAIN | null) =>
+  chain ? chain.split(':')[1] ?? null : null;
+
+const getChainLabel = (chain?: CHAIN | null) =>
+  chain ? CHAIN_LABELS[chain] ?? chain : 'Connected Chain';
+
+const isExternalChain = (chain?: CHAIN | null) => !!chain && chain !== PUSH_CHAIN;
+
+const getPrc20TokenConfig = (token?: TokenFormat | null) => {
+  if (!token?.address) return undefined;
+
+  const selectedAddress = token.address.trim().toLowerCase();
+
+  return PRC20_TOKENS.find(
+    (prcToken) => prcToken.prc20Address.trim().toLowerCase() === selectedAddress,
+  );
+};
+
+const getFallbackMoveableSymbol = (symbol: string) => {
+  if (symbol.startsWith('pETH')) return 'ETH';
+  if (symbol.startsWith('pBNB')) return 'BNB';
+  if (symbol.startsWith('pSOL')) return 'SOL';
+
+  return symbol.split('.')[0];
+};
+
+const getPushMoveableTokenForDetails = (
+  details?: TokenDetails | null,
+): PushMoveableToken | undefined => {
+  const selectedToken = details?.token;
+
+  if (!selectedToken?.address) return undefined;
+
+  const selectedAddress = selectedToken.address.trim().toLowerCase();
+  const pushMoveableTokens = PushChain.utils.tokens.getMoveableTokens(PUSH_CHAIN)
+    .tokens as PushMoveableToken[];
+
+  const sdkToken = pushMoveableTokens.find((token) => {
+    const address = token.address?.trim().toLowerCase();
+    const prc20Address = token.prc20Address?.trim().toLowerCase();
+
+    return address === selectedAddress || prc20Address === selectedAddress;
+  });
+
+  if (sdkToken) return sdkToken;
+
+  const prc20Token = getPrc20TokenConfig(selectedToken);
+
+  if (!prc20Token || prc20Token.sourceChain === PUSH_CHAIN) return undefined;
+
+  return {
+    chain: PUSH_CHAIN,
+    symbol: getFallbackMoveableSymbol(prc20Token.symbol),
+    decimals: selectedToken.decimals,
+    address: selectedToken.address,
+    mechanism: 'approve',
+    sourceChain: prc20Token.sourceChain,
+    prc20Address: selectedToken.address as `0x${string}`,
+  };
+};
+
+const isPushNativeTokenDetails = (details?: TokenDetails | null) =>
+  details?.source === 'push' &&
+  !details.native &&
+  !details.token?.address &&
+  details.token?.symbol === 'PC';
 
 const getMoveableTokenForDetails = (
   details: TokenDetails,
@@ -115,6 +216,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
   const [tokenDetails, setTokenDetails] = useState<TokenDetails | null>(initialTokenDetails || null);
   const [receiverAddress, setReceiverAddress] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
+  const [destinationNetwork, setDestinationNetwork] = useState<DestinationNetwork>('push');
 
   const [sendingTransaction, setSendingTransaction] = useState<boolean>(false);
 
@@ -138,6 +240,55 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     () => convertCaipToObject(parsedWallet),
     [parsedWallet],
   );
+
+  const connectedWalletChain = useMemo(
+    () => getChainFromWalletDetails(result),
+    [result],
+  );
+
+  const selectedPrc20MoveableToken = useMemo(
+    () => getPushMoveableTokenForDetails(tokenDetails),
+    [tokenDetails?.moveableToken, tokenDetails?.token?.address],
+  );
+  const isSelectedPrc20Token = !!selectedPrc20MoveableToken;
+  const isSelectedPushNativeToken = isPushNativeTokenDetails(tokenDetails);
+  const connectedDestinationChain = useMemo(() => {
+    if (isSelectedPrc20Token) {
+      return isExternalChain(selectedPrc20MoveableToken.sourceChain)
+        ? selectedPrc20MoveableToken.sourceChain
+        : null;
+    }
+
+    return isExternalChain(connectedWalletChain) ? connectedWalletChain : null;
+  }, [
+    connectedWalletChain,
+    isSelectedPrc20Token,
+    selectedPrc20MoveableToken?.sourceChain,
+  ]);
+  const canSelectDestinationNetwork =
+    (isSelectedPrc20Token || isSelectedPushNativeToken) &&
+    !!connectedDestinationChain;
+  const connectedDestinationOption = useMemo<DestinationNetworkOption | null>(() => {
+    if (!connectedDestinationChain) return null;
+
+    return {
+      value: 'connected',
+      label: getChainLabel(connectedDestinationChain),
+      chain: connectedDestinationChain,
+      chainId: getChainIdFromChain(connectedDestinationChain),
+    };
+  }, [connectedDestinationChain]);
+  const destinationNetworkOptions = useMemo(
+    () => [
+      PUSH_DESTINATION_OPTION,
+      ...(connectedDestinationOption ? [connectedDestinationOption] : []),
+    ],
+    [connectedDestinationOption],
+  );
+  const selectedDestinationNetwork =
+    destinationNetwork === 'connected' && connectedDestinationOption
+      ? connectedDestinationOption
+      : PUSH_DESTINATION_OPTION;
 
   const sendToken = async (token: TokenFormat) => {
     try {
@@ -177,6 +328,101 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
     } catch (error) {
       console.error("Error in sending transaction", error);
+      setTxError(getErrorMessage(error, 'Transaction failed'))
+      setSendingTransaction(false);
+    }
+  }
+
+  const sendPushNativeTokenToConnectedChain = async () => {
+    try {
+      if (!connectedDestinationChain) {
+        throw new Error('Missing connected chain.');
+      }
+
+      setSendingTransaction(true);
+      setTxError('');
+      const value = PushChain.utils.helpers.parseUnits((amount || '0').toString(), 18);
+
+      const payload: UniversalExecuteParams = {
+        to: {
+          address: receiverAddress,
+          chain: connectedDestinationChain,
+        },
+        value,
+      };
+
+      if (isOpenedInIframe) {
+        sendMessageToMainTab({
+          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
+          data: { ...payload, value: value.toString() },
+        });
+
+        return;
+      }
+
+      const receipt = await pushChainClient.universal.sendTransaction(payload);
+
+      if (receipt.finalTxHash) {
+        setSendState("confirmation");
+        setTxhash(receipt.finalTxHash);
+      }
+      setSendingTransaction(false);
+
+    } catch (error) {
+      console.error("Error in sending native token to connected chain", error);
+      setTxError(getErrorMessage(error, 'Transaction failed'))
+      setSendingTransaction(false);
+    }
+  }
+
+  const sendPrc20TokenToConnectedChain = async () => {
+    try {
+      if (!selectedPrc20MoveableToken) {
+        throw new Error('Unsupported PRC token for connected chain transfer.');
+      }
+
+      if (!connectedDestinationChain) {
+        throw new Error('Missing connected chain.');
+      }
+
+      setSendingTransaction(true);
+      setTxError('');
+
+      const value = PushChain.utils.helpers.parseUnits(
+        (amount || '0').toString(),
+        selectedPrc20MoveableToken.decimals,
+      );
+
+      const payload: UniversalExecuteParams = {
+        to: {
+          address: receiverAddress,
+          chain: connectedDestinationChain,
+        },
+        funds: {
+          amount: value,
+          token: selectedPrc20MoveableToken,
+        },
+      };
+
+      if (isOpenedInIframe) {
+        sendMessageToMainTab({
+          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
+          data: { ...payload, funds: { ...payload.funds, amount: value.toString() } },
+        });
+
+        return;
+      }
+
+      const receipt = await pushChainClient.universal.sendTransaction(payload);
+
+      if (receipt.finalTxHash) {
+        setSendState("confirmation");
+        setTxhash(receipt.finalTxHash);
+      }
+      setSendingTransaction(false);
+
+    } catch (error) {
+      console.error("Error in sending PRC token to connected chain", error);
       setTxError(getErrorMessage(error, 'Transaction failed'))
       setSendingTransaction(false);
     }
@@ -282,6 +528,23 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
   }
 
   const handleSendTransaction = async () => {
+    if (destinationNetwork === 'connected') {
+      if (!canSelectDestinationNetwork) {
+        setTxError('Connected chain transfers are unavailable for this token.');
+        return;
+      }
+
+      if (isSelectedPrc20Token) {
+        sendPrc20TokenToConnectedChain();
+        return;
+      }
+
+      if (isSelectedPushNativeToken) {
+        sendPushNativeTokenToConnectedChain();
+        return;
+      }
+    }
+
     if (tokenDetails?.source === 'cea') {
       sendMoveableTokenToPush('cea');
       return;
@@ -359,6 +622,20 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     if (txhash && sendState !== 'confirmation') setSendState("confirmation");
   }, [sendState, txhash])
 
+  useEffect(() => {
+    setDestinationNetwork('push');
+  }, [
+    tokenDetails?.native,
+    tokenDetails?.source,
+    tokenDetails?.token?.address,
+  ]);
+
+  useEffect(() => {
+    if (!canSelectDestinationNetwork && destinationNetwork !== 'push') {
+      setDestinationNetwork('push');
+    }
+  }, [canSelectDestinationNetwork, destinationNetwork]);
+
   const value = {
     walletAddress: executorAddress,
     sendState,
@@ -369,6 +646,11 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     setAmount,
     sendingTransaction,
     handleSendTransaction,
+    destinationNetwork,
+    setDestinationNetwork,
+    destinationNetworkOptions,
+    selectedDestinationNetwork,
+    canSelectDestinationNetwork,
     txhash,
     setTxhash,
     txError,

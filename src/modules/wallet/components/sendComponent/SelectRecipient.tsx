@@ -1,12 +1,118 @@
-import { Box, Button, Text, TextInput } from "blocks";
+import { Box, Button, CaretDown, CaretUp, Dropdown, Text, TextInput } from "blocks";
 import { TokenLogoComponent, truncateToDecimals } from "common";
 import { css } from "styled-components";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
-import { useSendTokenContext } from "../../../../context/SendTokenContext";
+import { DestinationNetworkOption, useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 import { useTokenBalance } from "../../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../../context/PushChainContext";
 import { getChainIcon } from "../OriginChainTokenListItem";
+import { useState } from "react";
+
+type RecipientNetworkSelectorProps = {
+  canSelectDestinationNetwork: boolean;
+  destinationNetworkOptions: DestinationNetworkOption[];
+  selectedDestinationNetwork: DestinationNetworkOption;
+  setDestinationNetwork: (network: DestinationNetworkOption['value']) => void;
+};
+
+const RecipientNetworkSelector = ({
+  canSelectDestinationNetwork,
+  destinationNetworkOptions,
+  selectedDestinationNetwork,
+  setDestinationNetwork,
+}: RecipientNetworkSelectorProps) => {
+  const isEnabled = canSelectDestinationNetwork && destinationNetworkOptions.length > 1;
+  const [hoveredNetwork, setHoveredNetwork] = useState<DestinationNetworkOption['value'] | null>(null);
+
+  const trigger = ({ isOpen = false }: { isOpen?: boolean } = {}) => (
+    <Box
+      display="flex"
+      alignItems="center"
+      gap="spacing-xxxs"
+      cursor={isEnabled ? "pointer" : "not-allowed"}
+      css={css`
+        opacity: ${isEnabled ? 1 : 0.5};
+        flex-shrink: 0;
+      `}
+    >
+      {getChainIcon(selectedDestinationNetwork.chainId, 24)}
+      {isEnabled && (
+        isOpen ? (
+          <CaretUp size={14} color="pw-int-icon-primary-color" />
+        ) : (
+          <CaretDown size={14} color="pw-int-icon-primary-color" />
+        )
+      )}
+    </Box>
+  );
+
+  if (!isEnabled) return trigger();
+
+  return (
+    <Dropdown
+      align="end"
+      side="bottom"
+      css={css`
+        z-index: 5;
+      `}
+      overlay={(setIsOpen) => (
+        <Box
+          display="flex"
+          flexDirection="column"
+          backgroundColor="pw-int-bg-secondary-color"
+          border="border-sm solid pw-int-border-secondary-color"
+          borderRadius="radius-xs"
+          overflow="hidden"
+          boxShadow="0 12px 32px rgba(0, 0, 0, 0.12)"
+          onMouseLeave={() => setHoveredNetwork(null)}
+          css={css`
+            width: 280px;
+            max-width: calc(100vw - 48px);
+          `}
+        >
+          {destinationNetworkOptions.map((option) => {
+            const isSelected = option.value === selectedDestinationNetwork.value;
+            const isActive = hoveredNetwork
+              ? option.value === hoveredNetwork
+              : isSelected;
+
+            return (
+              <Box
+                key={option.value}
+                display="flex"
+                alignItems="center"
+                gap="spacing-xs"
+                padding="spacing-xs"
+                cursor="pointer"
+                backgroundColor={isActive ? "pw-int-bg-primary-color" : "pw-int-bg-secondary-color"}
+                onMouseEnter={() => setHoveredNetwork(option.value)}
+                onClick={() => {
+                  setDestinationNetwork(option.value);
+                  setIsOpen(false);
+                }}
+                css={css`
+                  min-height: 44px;
+
+                  &:hover {
+                    background-color: var(--pw-int-bg-primary-color);
+                  }
+                `}
+              >
+                {getChainIcon(option.chainId, 28)}
+                <Text variant="bm-regular" color="pw-int-text-primary-color">
+                  {option.label}
+                </Text>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+    >
+      {trigger}
+    </Dropdown>
+  );
+};
 
 const SelectRecipient = () => {
   const {
@@ -20,7 +126,11 @@ const SelectRecipient = () => {
     setTokenDetails,
     nativeToken,
     nativeBalance,
-    loadingNativeBalance
+    loadingNativeBalance,
+    destinationNetworkOptions,
+    selectedDestinationNetwork,
+    setDestinationNetwork,
+    canSelectDestinationNetwork
   } = useSendTokenContext();
 
   const { setActiveState } = useWalletDashboard();
@@ -132,15 +242,22 @@ const SelectRecipient = () => {
           <TextInput
             value={receiverAddress}
             onChange={(e) => setReceiverAddress(e.target.value)}
-            placeholder="Recipient's Push Chain Address"
+            placeholder={`Recipient's ${selectedDestinationNetwork.label} Address`}
+            trailingIcon={
+              <RecipientNetworkSelector
+                canSelectDestinationNetwork={canSelectDestinationNetwork}
+                destinationNetworkOptions={destinationNetworkOptions}
+                selectedDestinationNetwork={selectedDestinationNetwork}
+                setDestinationNetwork={setDestinationNetwork}
+              />
+            }
             css={css`
               color: white;
               width: 100%;
             `}
           />
           <Text>
-            Only send to Push chain addresses. Other networks may result in lost
-            tokens
+            Only send to {selectedDestinationNetwork.label} addresses. Other networks may result in lost tokens
           </Text>
         </Box>
 
