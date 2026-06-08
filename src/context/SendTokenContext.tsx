@@ -41,7 +41,7 @@ interface SendTokenContextType {
   nativeToken: TokenFormat | null;
 }
 
-export type DestinationNetwork = 'push' | 'connected';
+export type DestinationNetwork = 'push' | 'associated';
 
 export type DestinationNetworkOption = {
   value: DestinationNetwork;
@@ -171,12 +171,6 @@ const getPushMoveableTokenForDetails = (
   };
 };
 
-const isPushNativeTokenDetails = (details?: TokenDetails | null) =>
-  details?.source === 'push' &&
-  !details.native &&
-  !details.token?.address &&
-  details.token?.symbol === 'PC';
-
 const getMoveableTokenForDetails = (
   details: TokenDetails,
   sourceChain: CHAIN,
@@ -241,53 +235,44 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     [parsedWallet],
   );
 
-  const connectedWalletChain = useMemo(
-    () => getChainFromWalletDetails(result),
-    [result],
-  );
-
   const selectedPrc20MoveableToken = useMemo(
     () => getPushMoveableTokenForDetails(tokenDetails),
     [tokenDetails?.moveableToken, tokenDetails?.token?.address],
   );
   const isSelectedPrc20Token = !!selectedPrc20MoveableToken;
-  const isSelectedPushNativeToken = isPushNativeTokenDetails(tokenDetails);
-  const connectedDestinationChain = useMemo(() => {
-    if (isSelectedPrc20Token) {
-      return isExternalChain(selectedPrc20MoveableToken.sourceChain)
+  const associatedDestinationChain = useMemo(
+    () =>
+      isSelectedPrc20Token && isExternalChain(selectedPrc20MoveableToken.sourceChain)
         ? selectedPrc20MoveableToken.sourceChain
-        : null;
-    }
-
-    return isExternalChain(connectedWalletChain) ? connectedWalletChain : null;
-  }, [
-    connectedWalletChain,
-    isSelectedPrc20Token,
-    selectedPrc20MoveableToken?.sourceChain,
-  ]);
+        : null,
+    [
+      isSelectedPrc20Token,
+      selectedPrc20MoveableToken?.sourceChain,
+    ],
+  );
   const canSelectDestinationNetwork =
-    (isSelectedPrc20Token || isSelectedPushNativeToken) &&
-    !!connectedDestinationChain;
-  const connectedDestinationOption = useMemo<DestinationNetworkOption | null>(() => {
-    if (!connectedDestinationChain) return null;
+    isSelectedPrc20Token &&
+    !!associatedDestinationChain;
+  const associatedDestinationOption = useMemo<DestinationNetworkOption | null>(() => {
+    if (!associatedDestinationChain) return null;
 
     return {
-      value: 'connected',
-      label: getChainLabel(connectedDestinationChain),
-      chain: connectedDestinationChain,
-      chainId: getChainIdFromChain(connectedDestinationChain),
+      value: 'associated',
+      label: getChainLabel(associatedDestinationChain),
+      chain: associatedDestinationChain,
+      chainId: getChainIdFromChain(associatedDestinationChain),
     };
-  }, [connectedDestinationChain]);
+  }, [associatedDestinationChain]);
   const destinationNetworkOptions = useMemo(
     () => [
       PUSH_DESTINATION_OPTION,
-      ...(connectedDestinationOption ? [connectedDestinationOption] : []),
+      ...(associatedDestinationOption ? [associatedDestinationOption] : []),
     ],
-    [connectedDestinationOption],
+    [associatedDestinationOption],
   );
   const selectedDestinationNetwork =
-    destinationNetwork === 'connected' && connectedDestinationOption
-      ? connectedDestinationOption
+    destinationNetwork === 'associated' && associatedDestinationOption
+      ? associatedDestinationOption
       : PUSH_DESTINATION_OPTION;
 
   const sendToken = async (token: TokenFormat) => {
@@ -333,56 +318,14 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     }
   }
 
-  const sendPushNativeTokenToConnectedChain = async () => {
-    try {
-      if (!connectedDestinationChain) {
-        throw new Error('Missing connected chain.');
-      }
-
-      setSendingTransaction(true);
-      setTxError('');
-      const value = PushChain.utils.helpers.parseUnits((amount || '0').toString(), 18);
-
-      const payload: UniversalExecuteParams = {
-        to: {
-          address: receiverAddress,
-          chain: connectedDestinationChain,
-        },
-        value,
-      };
-
-      if (isOpenedInIframe) {
-        sendMessageToMainTab({
-          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
-          data: { ...payload, value: value.toString() },
-        });
-
-        return;
-      }
-
-      const receipt = await pushChainClient.universal.sendTransaction(payload);
-
-      if (receipt.finalTxHash) {
-        setSendState("confirmation");
-        setTxhash(receipt.finalTxHash);
-      }
-      setSendingTransaction(false);
-
-    } catch (error) {
-      console.error("Error in sending native token to connected chain", error);
-      setTxError(getErrorMessage(error, 'Transaction failed'))
-      setSendingTransaction(false);
-    }
-  }
-
-  const sendPrc20TokenToConnectedChain = async () => {
+  const sendPrc20TokenToAssociatedChain = async () => {
     try {
       if (!selectedPrc20MoveableToken) {
-        throw new Error('Unsupported PRC token for connected chain transfer.');
+        throw new Error('Unsupported PRC token for associated chain transfer.');
       }
 
-      if (!connectedDestinationChain) {
-        throw new Error('Missing connected chain.');
+      if (!associatedDestinationChain) {
+        throw new Error('Missing associated chain.');
       }
 
       setSendingTransaction(true);
@@ -396,7 +339,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
       const payload: UniversalExecuteParams = {
         to: {
           address: receiverAddress,
-          chain: connectedDestinationChain,
+          chain: associatedDestinationChain,
         },
         funds: {
           amount: value,
@@ -422,7 +365,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
       setSendingTransaction(false);
 
     } catch (error) {
-      console.error("Error in sending PRC token to connected chain", error);
+      console.error("Error in sending PRC token to associated chain", error);
       setTxError(getErrorMessage(error, 'Transaction failed'))
       setSendingTransaction(false);
     }
@@ -528,19 +471,14 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
   }
 
   const handleSendTransaction = async () => {
-    if (destinationNetwork === 'connected') {
+    if (destinationNetwork === 'associated') {
       if (!canSelectDestinationNetwork) {
-        setTxError('Connected chain transfers are unavailable for this token.');
+        setTxError('Associated chain transfers are only available for PRC tokens.');
         return;
       }
 
       if (isSelectedPrc20Token) {
-        sendPrc20TokenToConnectedChain();
-        return;
-      }
-
-      if (isSelectedPushNativeToken) {
-        sendPushNativeTokenToConnectedChain();
+        sendPrc20TokenToAssociatedChain();
         return;
       }
     }
