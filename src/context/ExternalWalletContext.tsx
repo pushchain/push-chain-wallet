@@ -6,6 +6,8 @@ import {
   IWalletProvider,
 } from "../types/wallet.types";
 import { walletRegistry } from "../providers/WalletProviderRegistry";
+import type { SignAuthorizationParams, SignedAuthorization } from '@pushchain/core';
+import { EIP7702_UNSUPPORTED_ERROR } from '../services/pushWallet/eip7702';
 
 type ExternalWalletContextType = {
   externalWallet: ExternalWalletType | null;
@@ -19,6 +21,10 @@ type ExternalWalletContextType = {
   signTransactionRequest: (data: Uint8Array) => Promise<Uint8Array>;
   signMessageRequest: (data: Uint8Array) => Promise<Uint8Array>;
   signTypedDataRequest: (data: ITypedData) => Promise<Uint8Array>;
+  signAuthorizationRequest: (
+    params: SignAuthorizationParams
+  ) => Promise<SignedAuthorization>;
+  canSignAuthorization: boolean;
 
   isWalletInstalled: (provider: IWalletProvider) => Promise<boolean>;
 };
@@ -160,6 +166,29 @@ export const ExternalWalletContextProvider = ({
     }
   };
 
+  const authorizationProvider = externalWallet
+    ? walletRegistry.getProvider(externalWallet.providerName)
+    : undefined;
+  const canSignAuthorization =
+    typeof authorizationProvider?.signAuthorization === 'function';
+
+  const signAuthorizationRequest = async (
+    params: SignAuthorizationParams
+  ): Promise<SignedAuthorization> => {
+    if (!externalWallet) {
+      throw new Error("No wallet connected");
+    }
+
+    const providerReceived = walletRegistry.getProvider(
+      externalWallet.providerName
+    );
+    if (typeof providerReceived?.signAuthorization !== 'function') {
+      throw new Error(EIP7702_UNSUPPORTED_ERROR);
+    }
+
+    return providerReceived.signAuthorization(params);
+  };
+
   return (
     <ExternalWalletContext.Provider
       value={{
@@ -172,6 +201,8 @@ export const ExternalWalletContextProvider = ({
         signTransactionRequest,
         signMessageRequest,
         signTypedDataRequest,
+        signAuthorizationRequest,
+        canSignAuthorization,
       }}
     >
       {children}

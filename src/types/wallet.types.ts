@@ -1,6 +1,7 @@
 import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
 import { ReactNode } from "react";
 import { TypedData, TypedDataDomain } from 'viem';
+import type { SignAuthorizationParams, SignedAuthorization } from '@pushchain/core';
 
 export enum ChainType {
   ETHEREUM = "sepolia",
@@ -41,6 +42,9 @@ export interface IWalletProvider {
   signMessage(message: Uint8Array): Promise<Uint8Array>;
   signAndSendTransaction(txn: Uint8Array): Promise<Uint8Array>;
   signTypedData(typedData: ITypedData): Promise<Uint8Array>;
+  signAuthorization?: (
+    params: SignAuthorizationParams
+  ) => Promise<SignedAuthorization>;
   disconnect(): Promise<void>;
   getChainId(): Promise<unknown>;
   switchNetwork?(chainName: ChainType): Promise<void>;
@@ -132,5 +136,7 @@ export interface EthereumTransactionReceipt {
 
 export type WalletEventRespoonse = {
   signature?: Uint8Array;
+  authorization?: SignedAuthorization;
   account?: UniversalAccount;
+  supportsSignAuthorization?: boolean;
 };

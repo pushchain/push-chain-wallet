@@ -18,6 +18,7 @@ export enum WALLET_TO_APP_ACTION {
   SIGN_MESSAGE = "signatureMessage",
   SIGN_TRANSACTION = "signatureTransaction",
   SIGN_TYPED_DATA = "signatureTypedData",
+  SIGN_AUTHORIZATION = "signatureAuthorization",
 
   IS_LOGGED_OUT = "loggedOut",
   TAB_CLOSED = "tabClosed",
@@ -40,6 +41,7 @@ export enum APP_TO_WALLET_ACTION {
   SIGN_MESSAGE = 'signMessage',
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_TYPED_DATA = 'signTypedData',
+  SIGN_AUTHORIZATION = 'signAuthorization',
   ERROR = "error",
   LOG_OUT = "logOut",
 

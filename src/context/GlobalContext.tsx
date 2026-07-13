@@ -14,12 +14,16 @@ import { APP_ROUTES } from "../constants";
 import { useExternalWallet } from "./ExternalWalletContext";
 import { WalletConfig, ExternalWalletType, UniversalAccount, ITypedData } from "../types/wallet.types";
 import { PushWallet } from "../services/pushWallet/pushWallet";
+import type { SignAuthorizationParams, SignedAuthorization } from '@pushchain/core';
 
 export type PushWalletSocial = {
   universalSigner: {
     signMessage: (message: Uint8Array) => Promise<Uint8Array>;
     signTypedData: (typedData: ITypedData) => Promise<Uint8Array>;
     signAndSendTransaction: (txn: Uint8Array) => Promise<Uint8Array>;
+    signAuthorization?: (
+      params: SignAuthorizationParams
+    ) => Promise<SignedAuthorization>;
     account: UniversalAccount;
   };
 }

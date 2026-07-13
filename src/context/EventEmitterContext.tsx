@@ -30,6 +30,9 @@ import { useExternalWallet } from "./ExternalWalletContext";
 import { walletRegistry } from "../providers/WalletProviderRegistry";
 import { useWaapAuth } from "../waap/useWaapAuth";
 import { TypedData, TypedDataDomain } from "viem";
+import type { SignAuthorizationParams, SignedAuthorization } from '@pushchain/core';
+import { EIP7702_UNSUPPORTED_ERROR } from '../services/pushWallet/eip7702';
+import { bridgeError, SigningRequestRegistry } from '../common/signingBridge';
 import {
   consumePhantomMobileConnectRequest,
   isPhantomMobileHandoffEnabled,
@@ -107,10 +110,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
   const walletRef = useRef(state.wallet);
   walletRef.current = state.wallet;
 
-  const signatureResolverRef = useRef<{
-    success?: (data: WalletEventRespoonse) => void;
-    error?: (data: WalletEventRespoonse) => void;
-  } | null>(null);
+  const signingRequestsRef = useRef(new SigningRequestRegistry());
 
   useEffect(() => {
     if (walletRef.current && !isLoggedEmitterCalled) {
@@ -212,33 +212,34 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
             break;
           case APP_TO_WALLET_ACTION.SIGN_MESSAGE:
             if (isUIKitVersion('6')) {
-              if (signatureResolverRef.current) {
-                signatureResolverRef?.current?.success?.(event.data.data);
-              }
+              signingRequestsRef.current.resolve(event.data);
             } else {
-              handleSignAndSendMessage(event.data.data);
+              handleSignAndSendMessage(event.data.data, event.data.requestId);
             }
             break;
           case APP_TO_WALLET_ACTION.SIGN_TRANSACTION:
             if (isUIKitVersion('6')) {
-              if (signatureResolverRef.current) {
-                signatureResolverRef?.current?.success?.(event.data.data);
-              }
+              signingRequestsRef.current.resolve(event.data);
             } else {
-              handleSignAndSendTransaction(event.data.data);
+              handleSignAndSendTransaction(event.data.data, event.data.requestId);
             }
             break;
           case APP_TO_WALLET_ACTION.SIGN_TYPED_DATA:
             if (isUIKitVersion('6')) {
-              if (signatureResolverRef.current) {
-                signatureResolverRef?.current?.success?.(event.data.data);
-              }
+              signingRequestsRef.current.resolve(event.data);
             } else {
-              handleSignTypedData(event.data.data);
+              handleSignTypedData(event.data.data, event.data.requestId);
+            }
+            break;
+          case APP_TO_WALLET_ACTION.SIGN_AUTHORIZATION:
+            if (isUIKitVersion('6')) {
+              signingRequestsRef.current.resolve(event.data);
+            } else {
+              handleSignAuthorization(event.data.data, event.data.requestId);
             }
             break;
           case APP_TO_WALLET_ACTION.ERROR:
-            signatureResolverRef?.current?.error?.(event.data.data);
+            signingRequestsRef.current.reject(event.data);
             break;
           case APP_TO_WALLET_ACTION.LOG_OUT:
             handleLogOutEvent();
@@ -418,7 +419,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const handleSignAndSendMessage = async (message: Uint8Array) => {
+  const handleSignAndSendMessage = async (message: Uint8Array, requestId?: string) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
@@ -426,6 +427,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_MESSAGE,
+        requestId,
         data: { signature },
       });
 
@@ -437,14 +439,15 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.ERROR,
+        requestId,
         data: {
-          error: error,
+          error: bridgeError(error),
         },
       });
     }
   };
 
-  const handleSignAndSendTransaction = async (txn: Uint8Array) => {
+  const handleSignAndSendTransaction = async (txn: Uint8Array, requestId?: string) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
@@ -452,6 +455,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TRANSACTION,
+        requestId,
         data: { signature },
       });
 
@@ -463,8 +467,9 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.ERROR,
+        requestId,
         data: {
-          error: error,
+          error: bridgeError(error),
         },
       });
     }
@@ -475,7 +480,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     types: TypedData;
     primaryType: string;
     message: Record<string, unknown>;
-  }) => {
+  }, requestId?: string) => {
     try {
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
 
@@ -483,6 +488,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.SIGN_TYPED_DATA,
+        requestId,
         data: { signature },
       });
 
@@ -494,9 +500,35 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
       sendMessageToMainTab({
         type: WALLET_TO_APP_ACTION.ERROR,
+        requestId,
         data: {
-          error: error,
+          error: bridgeError(error),
         },
+      });
+    }
+  };
+
+  const handleSignAuthorization = async (
+    params: SignAuthorizationParams,
+    requestId?: string,
+  ) => {
+    try {
+      const signAuthorization = walletRef.current?.universalSigner.signAuthorization;
+      if (typeof signAuthorization !== 'function') {
+        throw new Error(EIP7702_UNSUPPORTED_ERROR);
+      }
+
+      const authorization = await signAuthorization(params);
+      sendMessageToMainTab({
+        type: WALLET_TO_APP_ACTION.SIGN_AUTHORIZATION,
+        requestId,
+        data: { authorization },
+      });
+    } catch (error) {
+      sendMessageToMainTab({
+        type: WALLET_TO_APP_ACTION.ERROR,
+        requestId,
+        data: { error: bridgeError(error) },
       });
     }
   };
@@ -504,6 +536,7 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
   const handleSocialConnection = (data: {
     account?: UniversalAccount,
     error?: boolean,
+    supportsSignAuthorization?: boolean,
   }) => {
     setSocialConnectionLoading(false);
 
@@ -517,6 +550,9 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
         signMessage: handleSendSignRequestToPushWallet,
         signTypedData: handleSendSignTypedDataRequestToPushWallet,
         signAndSendTransaction: handleSendSignTransactionRequestToPushWallet,
+        ...(data.supportsSignAuthorization
+          ? { signAuthorization: handleSendSignAuthorizationRequestToPushWallet }
+          : {}),
         account: data.account
       }
     }
@@ -539,97 +575,49 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
   const handleSendSignRequestToPushWallet = (
     data: Uint8Array
   ): Promise<Uint8Array> => {
-    return new Promise((resolve, reject) => {
-      if (signatureResolverRef.current) {
-        reject(new Error('Another sign request is already in progress'));
-        return;
-      }
-
-      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
-
-      signatureResolverRef.current = {
-        success: (response: WalletEventRespoonse) => {
-          resolve(response.signature!);
-          signatureResolverRef.current = null;
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
-        },
-        error: () => {
-          signatureResolverRef.current = null; // Clean up
-          reject(new Error('Signature request failed'));
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
-        },
-      };
-
-      // Send the sign request to the wallet tab
-      sendMessageToMainTab({
-        type: APP_TO_WALLET_ACTION.SIGN_MESSAGE,
-        data,
-      });
-    });
+    dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+    return signingRequestsRef.current.request<Uint8Array, WalletEventRespoonse>(
+      APP_TO_WALLET_ACTION.SIGN_MESSAGE,
+      data,
+      sendMessageToMainTab,
+      () => dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" }),
+    ).then((response) => response.signature!);
   };
 
   const handleSendSignTransactionRequestToPushWallet = (
     data: Uint8Array
   ): Promise<Uint8Array> => {
-    return new Promise((resolve, reject) => {
-      if (signatureResolverRef.current) {
-        reject(new Error('Another sign request is already in progress'));
-        return;
-      }
-
-      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
-
-      signatureResolverRef.current = {
-        success: (response: WalletEventRespoonse) => {
-          resolve(response.signature!);
-          signatureResolverRef.current = null;
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
-        },
-        error: () => {
-          signatureResolverRef.current = null; // Clean up
-          reject(new Error('Signature request failed'));
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
-        },
-      };
-
-      // Send the sign request to the wallet tab
-      sendMessageToMainTab({
-        type: APP_TO_WALLET_ACTION.SIGN_TRANSACTION,
-        data,
-      });
-    });
+    dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+    return signingRequestsRef.current.request<Uint8Array, WalletEventRespoonse>(
+      APP_TO_WALLET_ACTION.SIGN_TRANSACTION,
+      data,
+      sendMessageToMainTab,
+      () => dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" }),
+    ).then((response) => response.signature!);
   };
 
   const handleSendSignTypedDataRequestToPushWallet = (
     data: ITypedData
   ): Promise<Uint8Array> => {
-    return new Promise((resolve, reject) => {
-      if (signatureResolverRef.current) {
-        reject(new Error('Another sign request is already in progress'));
-        return;
-      }
+    dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+    return signingRequestsRef.current.request<ITypedData, WalletEventRespoonse>(
+      APP_TO_WALLET_ACTION.SIGN_TYPED_DATA,
+      data,
+      sendMessageToMainTab,
+      () => dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" }),
+    ).then((response) => response.signature!);
+  };
 
-      dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
-
-      signatureResolverRef.current = {
-        success: (response: WalletEventRespoonse) => {
-          resolve(response.signature!);
-          signatureResolverRef.current = null;
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" });
-        },
-        error: () => {
-          signatureResolverRef.current = null; // Clean up
-          reject(new Error('Signature request failed'));
-          dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "rejected" });
-        },
-      };
-
-      // Send the sign request to the wallet tab
-      sendMessageToMainTab({
-        type: APP_TO_WALLET_ACTION.SIGN_TYPED_DATA,
-        data,
-      });
-    });
+  const handleSendSignAuthorizationRequestToPushWallet = (
+    params: SignAuthorizationParams
+  ): Promise<SignedAuthorization> => {
+    dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "loading" });
+    return signingRequestsRef.current.request<SignAuthorizationParams, WalletEventRespoonse>(
+      APP_TO_WALLET_ACTION.SIGN_AUTHORIZATION,
+      params,
+      sendMessageToMainTab,
+      () => dispatch({ type: "SET_MESSAGE_SIGN_STATE", payload: "idle" }),
+    ).then((response) => response.authorization!);
   };
 
   const handleNewConnectionRequest = (origin: string) => {
@@ -667,6 +655,8 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       type: WALLET_TO_APP_ACTION.APP_CONNECTION_SUCCESS,
       data: {
         account: universalAccount,
+        supportsSignAuthorization:
+          typeof walletRef?.current?.universalSigner.signAuthorization === 'function',
       },
     });
   };
@@ -745,6 +735,8 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       type: WALLET_TO_APP_ACTION.IS_LOGGED_IN,
       data: {
         account: account ?? null,
+        supportsSignAuthorization:
+          typeof walletRef?.current?.universalSigner.signAuthorization === 'function',
       },
     });
   };

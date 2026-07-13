@@ -5,6 +5,8 @@ import nacl from 'tweetnacl'
 import { createWalletClient, defineChain, hexToBytes, http, parseTransaction, TypedData, TypedDataDomain } from 'viem'
 import { clusterApiUrl, Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { CHAIN } from '@pushchain/core/src/lib/constants/enums'
+import type { SignAuthorizationParams, SignedAuthorization } from '@pushchain/core'
+import { normalizeSignedAuthorization } from './eip7702'
 import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 
 export type ChainSignerHandler = (masterNode: HDKey) => Promise<{
@@ -17,6 +19,9 @@ export type ChainSignerHandler = (masterNode: HDKey) => Promise<{
     primaryType: string;
     message: Record<string, unknown>;
   }) => Promise<Uint8Array> | undefined
+  signAuthorization?: (
+    params: SignAuthorizationParams
+  ) => Promise<SignedAuthorization>
 }>
 
 export const VIEM_PUSH_TESTNET_DONUT = defineChain({
@@ -45,6 +50,11 @@ export const chainSignerRegistry: Partial<Record<CHAIN, ChainSignerHandler>> = {
   [CHAIN.ETHEREUM_MAINNET]: async (masterNode) => {
     const node = masterNode.derive("m/44'/60'/0'/0/0")
     const account = privateKeyToAccount(`0x${bytesToHex(node.privateKey!)}`)
+    const walletClient = createWalletClient({
+      account,
+      chain: VIEM_PUSH_TESTNET_DONUT,
+      transport: http(),
+    })
     return {
       address: account.address,
       signMessage: async (data) => {
@@ -52,11 +62,6 @@ export const chainSignerRegistry: Partial<Record<CHAIN, ChainSignerHandler>> = {
         return hexToBytes(sig)
       },
       signAndSendTransaction: async (unsignedTx) => {
-        const walletClient = createWalletClient({
-          account,
-          chain: VIEM_PUSH_TESTNET_DONUT,
-          transport: http(),
-        })
         const hex = `0x${bytesToHex(unsignedTx)}` as `0x${string}`;
         const tx = parseTransaction(hex);
         const txHash = await walletClient.sendTransaction(tx as never);
@@ -65,6 +70,17 @@ export const chainSignerRegistry: Partial<Record<CHAIN, ChainSignerHandler>> = {
       signTypedData: async (typedData) => {
         const sig = await account.signTypedData(typedData);
         return hexToBytes(sig);
+      },
+      signAuthorization: async (params) => {
+        const auth = await walletClient.signAuthorization({
+          account,
+          contractAddress: params.contractAddress,
+          ...(params.chainId !== undefined ? { chainId: params.chainId } : {}),
+          ...(params.nonce !== undefined ? { nonce: params.nonce } : {}),
+          ...(params.executor !== undefined ? { executor: params.executor } : {}),
+        })
+
+        return normalizeSignedAuthorization(auth, params)
       },
     }
   },

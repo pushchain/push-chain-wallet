@@ -36,6 +36,8 @@ export const PushChainProvider: React.FC<PushChainProviderProps> = ({ children }
         signMessageRequest,
         signTransactionRequest,
         signTypedDataRequest,
+        signAuthorizationRequest,
+        canSignAuthorization,
     } = useExternalWallet();
     const { handleReconnectWallet, handleReconnectExternalWallet } = useEventEmitterContext();
 
@@ -76,6 +78,13 @@ export const PushChainProvider: React.FC<PushChainProviderProps> = ({ children }
                     signMessage: state.wallet ? state.wallet.universalSigner.signMessage : signMessageRequest,
                     signAndSendTransaction: state.wallet ? state.wallet.universalSigner.signAndSendTransaction : signTransactionRequest,
                     signTypedData: isSolana ? undefined : state.wallet ? state.wallet.universalSigner.signTypedData : signTypedDataRequest,
+                    signAuthorization: isSolana
+                        ? undefined
+                        : state.wallet
+                            ? state.wallet.universalSigner.signAuthorization
+                            : canSignAuthorization
+                                ? signAuthorizationRequest
+                                : undefined,
                 }
             );
 

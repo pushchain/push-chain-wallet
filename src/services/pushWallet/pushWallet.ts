@@ -57,7 +57,13 @@ export class PushWallet {
     const handler = chainSignerRegistry[chain]
     if (!handler) throw new Error(`Unsupported chain: ${chain}`)
 
-    const { address, signMessage, signAndSendTransaction, signTypedData } = await handler(masterNode)
+    const {
+      address,
+      signMessage,
+      signAndSendTransaction,
+      signTypedData,
+      signAuthorization,
+    } = await handler(masterNode)
 
     const signerSkeleton = PushChain.utils.signer.construct(
       {
@@ -67,7 +73,8 @@ export class PushWallet {
       {
         signMessage: signMessage,
         signAndSendTransaction: signAndSendTransaction,
-        signTypedData: signTypedData
+        signTypedData: signTypedData,
+        signAuthorization: signAuthorization,
       }
     );
 
