@@ -1763,9 +1763,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pushchain/core@npm:^6.0.16":
-  version: 6.0.16
-  resolution: "@pushchain/core@npm:6.0.16"
+"@pushchain/core@npm:^6.0.17":
+  version: 6.0.17
+  resolution: "@pushchain/core@npm:6.0.17"
   dependencies:
     "@bufbuild/protobuf": "npm:^2.0.0"
     "@cosmjs/crypto": "npm:0.33.1"
@@ -1790,7 +1790,7 @@ __metadata:
       optional: true
     tweetnacl:
       optional: true
-  checksum: 10/b63e859729f8c0f91efe6c11407bd5681ea21e77e2c97d4a99def0e82d0b31a9b2a6aebdbf7406573c32a6b95f9e5368bab49bc5136b8d8079d24139d802b71f
+  checksum: 10/5d3713223b0212a9876eafc861ca2d8fd86326952d9185c38ab032aa6759db09758083b21b5e40c21e91e13cc4b4d32fe63260595d01a5d27f66520d63921815
   languageName: node
   linkType: hard
 
@@ -9231,7 +9231,7 @@ __metadata:
     "@metamask/jazzicon": "npm:^2.0.0"
     "@metamask/sdk": "npm:^0.32.0"
     "@noble/hashes": "npm:^1.0.0"
-    "@pushchain/core": "npm:^6.0.16"
+    "@pushchain/core": "npm:^6.0.17"
     "@radix-ui/react-dropdown-menu": "npm:^2.1.1"
     "@radix-ui/react-tooltip": "npm:^1.1.1"
     "@reach/tabs": "npm:^0.18.0"

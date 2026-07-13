@@ -22,6 +22,22 @@ const WalletDashboard: FC = () => {
     const { executorAddress, isLoading } = usePushChain();
 
     const walletList = useMemo(() => getWalletlist(state.wallet), [state.wallet]);
+    const activityWalletAliases = useMemo(
+        () => [
+            executorAddress,
+            selectedWallet?.address,
+            selectedWallet?.fullAddress,
+            state.externalWallet?.originAddress,
+            state.pushWallet?.address,
+        ].filter((address): address is string => !!address),
+        [
+            executorAddress,
+            selectedWallet?.address,
+            selectedWallet?.fullAddress,
+            state.externalWallet?.originAddress,
+            state.pushWallet?.address,
+        ],
+    );
 
     if (isLoading)
         return (
@@ -36,6 +52,7 @@ const WalletDashboard: FC = () => {
             <WalletTabs
                 walletList={walletList}
                 walletAddress={executorAddress}
+                walletAliases={activityWalletAliases}
                 selectedWallet={selectedWallet}
                 setSelectedWallet={setSelectedWallet}
                 setActiveState={setActiveState}

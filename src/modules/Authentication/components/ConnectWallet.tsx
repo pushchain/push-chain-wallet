@@ -17,6 +17,7 @@ import { ChainType, WalletCategoriesType } from "../../../types/wallet.types";
 import { useGlobalState } from "../../../context/GlobalContext";
 import { useConnectExternalWallet } from "../../../hooks/useConnectExternalWallet";
 import { walletRegistry } from "../../../providers/WalletProviderRegistry";
+import { isPhantomMobileHandoffEnabled } from "../../../providers/solana/phantomMobile";
 
 type WalletSelectionProps = {
   setConnectMethod: (connectMethod: WalletState) => void;
@@ -39,6 +40,12 @@ const ConnectWallet: FC<WalletSelectionProps> = ({ setConnectMethod }) => {
     filtered = isMobile
       ? filtered.filter((wallet) => wallet.isMobile === isMobile)
       : filtered;
+
+    if (isMobile && !isPhantomMobileHandoffEnabled()) {
+      filtered = filtered.filter(
+        (wallet) => wallet.chain !== ChainType.SOLANA
+      );
+    }
 
     const showArbitrumAndBase = isUIKitVersion('2') || !isOpenedInIframe;
 
@@ -69,7 +76,12 @@ const ConnectWallet: FC<WalletSelectionProps> = ({ setConnectMethod }) => {
     }
 
     return filtered;
-  }, [walletConfig?.loginDefaults?.wallet?.chains, isMobile]);
+  }, [
+    walletConfig?.loginDefaults?.wallet?.chains,
+    walletConfig?.loginDefaults?.wallet?.excludedChains,
+    isMobile,
+    isOpenedInIframe,
+  ]);
 
   const handleCategoryClick = async (walletCategory: WalletCategoriesType) => {
     setActiveWalletCategory(walletCategory);

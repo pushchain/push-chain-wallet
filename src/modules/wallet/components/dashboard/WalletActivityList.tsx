@@ -8,12 +8,17 @@ import { EXPLORER_URL } from "common";
 import { css } from "styled-components";
 
 export type WalletActivityListProps = {
-  address: string;
+  address: string | null;
+  walletAliases?: string[];
 };
 
-const WalletActivityList: FC<WalletActivityListProps> = ({ address }) => {
+const WalletActivityList: FC<WalletActivityListProps> = ({
+  address,
+  walletAliases = [],
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const observer = useRef<IntersectionObserver | null>(null);
+  const activityAddress = address ?? '';
 
   const {
     data,
@@ -23,7 +28,12 @@ const WalletActivityList: FC<WalletActivityListProps> = ({ address }) => {
     fetchNextPage,
     refetch,
     error,
-  } = useGetWalletActivities({ address });
+  } = useGetWalletActivities({ address: activityAddress });
+
+  const trackedAddresses = useMemo(
+    () => [activityAddress, ...walletAliases].filter(Boolean),
+    [activityAddress, walletAliases],
+  );
 
   const allTransactions = useMemo(() => {
     return data?.pages.flatMap(page => page.items) || [];
@@ -65,10 +75,10 @@ const WalletActivityList: FC<WalletActivityListProps> = ({ address }) => {
   }, [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   useEffect(() => {
-    if (address) {
+    if (activityAddress) {
       refetch();
     }
-  }, [address, refetch]);
+  }, [activityAddress, refetch]);
 
   useEffect(() => {
     return () => {
@@ -133,7 +143,7 @@ const WalletActivityList: FC<WalletActivityListProps> = ({ address }) => {
           >
             <WalletActivityListItem
               transaction={transaction}
-              address={address}
+              addresses={trackedAddresses}
             />
           </Box>
         );

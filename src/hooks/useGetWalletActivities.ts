@@ -5,6 +5,7 @@ import { ActivitiesNextPageParams } from '../types/walletactivities.types';
 
 export const useGetWalletActivities = (params: FetchWalletActivitiesParams) => {
     const { address, limit = 10, filter } = params;
+    const refetchInterval = 15_000;
 
     return useInfiniteQuery({
         queryKey: ['transactions', address, limit, filter],
@@ -20,6 +21,9 @@ export const useGetWalletActivities = (params: FetchWalletActivitiesParams) => {
             return lastPage.next_page_params || undefined;
         },
         initialPageParam: undefined as ActivitiesNextPageParams | undefined,
-        staleTime: 5 * 60 * 1000,
+        refetchInterval,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: true,
+        staleTime: refetchInterval,
     });
 };

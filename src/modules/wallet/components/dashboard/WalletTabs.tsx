@@ -12,7 +12,8 @@ const WALLET_TAB_KEYS: WalletTabKey[] = ['tokens', 'activity', 'subAccounts', 'r
 
 export type WalletTabsProps = {
   walletList: WalletListType[];
-  walletAddress: string;
+  walletAddress: string | null;
+  walletAliases?: string[];
   selectedWallet: WalletListType;
   setSelectedWallet: (wallet: WalletListType) => void;
   setActiveState: (activeStates: ActiveStates) => void;
@@ -20,6 +21,7 @@ export type WalletTabsProps = {
 
 const WalletTabs: FC<WalletTabsProps> = ({
   walletAddress,
+  walletAliases = [],
   setActiveState
 }) => {
   const [activeTab, setActiveTab] = useState<WalletTabKey>('tokens');
@@ -49,9 +51,8 @@ const WalletTabs: FC<WalletTabsProps> = ({
             children: (
               activeTab === 'activity' ? (
                 <WalletActivityList
-                  address={
-                    walletAddress
-                  }
+                  address={walletAddress}
+                  walletAliases={walletAliases}
                 />
               ) : null
             ),

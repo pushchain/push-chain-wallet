@@ -12,9 +12,13 @@ interface ChainWalletSelectorProps {
 const ChainSelector: FC<ChainWalletSelectorProps> = ({ selectedWalletCategory }) => {
   const isMobile = useDeviceWidthCheck(parseInt(deviceSizes.laptop));
   const wallets = walletRegistry.getProvidersByChain(selectedWalletCategory.chain);
-  const filteredWallets = isMobile && selectedWalletCategory.chain === ChainType.ETHEREUM
-    ? wallets.filter((wallet) => wallet.name === "MetaMask")
-    : wallets;
+  const filteredWallets = (() => {
+    if (isMobile && selectedWalletCategory.chain === ChainType.ETHEREUM) {
+      return wallets.filter((wallet) => wallet.name === "MetaMask");
+    }
+
+    return wallets;
+  })();
 
   if (filteredWallets.length === 0) {
     return (

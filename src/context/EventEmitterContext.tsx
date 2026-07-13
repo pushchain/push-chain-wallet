@@ -30,6 +30,11 @@ import { useExternalWallet } from "./ExternalWalletContext";
 import { walletRegistry } from "../providers/WalletProviderRegistry";
 import { useWaapAuth } from "../waap/useWaapAuth";
 import { TypedData, TypedDataDomain } from "viem";
+import {
+  consumePhantomMobileConnectRequest,
+  isPhantomMobileHandoffEnabled,
+  PHANTOM_PROVIDER_NAME,
+} from "../providers/solana/phantomMobile";
 
 // Define the shape of the app state
 export type EventEmitterState = {
@@ -96,8 +101,6 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
 
   const { logoutWaap } = useWaapAuth();
 
-  const isOpenedInIframe = !!getAppParamValue();
-
   // TODO: Right now we check the logged in wallet type. But we need to support the functionality of selected wallet type of the app.
 
   // For social login and email
@@ -115,6 +118,59 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
       handleUserLoggedIn();
     }
   }, [walletRef.current]);
+
+  useEffect(() => {
+    if (!isPhantomMobileHandoffEnabled()) return;
+
+    const requestedChain = consumePhantomMobileConnectRequest();
+    if (!requestedChain) return;
+
+    const provider = walletRegistry.getProvider(PHANTOM_PROVIDER_NAME);
+    if (!provider) return;
+
+    let cancelled = false;
+
+    const resumePhantomMobileConnection = async () => {
+      try {
+        dispatch({
+          type: "SET_EXTERNAL_WALLET_AUTH_LOAD_STATE",
+          payload: "loading",
+        });
+
+        const address = await connect(provider, requestedChain);
+        if (cancelled || !address) return;
+
+        const walletPayload: ExternalWalletType = {
+          originAddress: address,
+          chainType: requestedChain,
+          providerName: provider.name,
+        };
+
+        dispatch({
+          type: "SET_EXTERNAL_WALLET_AUTH_LOAD_STATE",
+          payload: "success",
+        });
+        dispatch({ type: "SET_WALLET_LOAD_STATE", payload: "success" });
+        dispatch({ type: "SET_EXTERNAL_WALLET", payload: walletPayload });
+        setExternalWallet(walletPayload);
+        navigate(`${persistQuery(APP_ROUTES.WALLET)}`, {
+          replace: true,
+        });
+      } catch (error) {
+        console.log("Failed to resume Phantom mobile connection", error);
+        dispatch({
+          type: "SET_EXTERNAL_WALLET_AUTH_LOAD_STATE",
+          payload: "rejected",
+        });
+      }
+    };
+
+    resumePhantomMobileConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   
   // useEffect(() => {
@@ -276,7 +332,21 @@ export const EventEmitterProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const handleReadOnlyWalletConnection = (data: any) => {
+  type ReadOnlyWalletConnectionData =
+    | {
+        status: string;
+        address: string;
+        providerName: IWalletProvider["name"];
+        chainType: ChainType;
+      }
+    | {
+        status: string;
+        chain: CHAIN;
+        address: string;
+        providerName?: undefined;
+      };
+
+  const handleReadOnlyWalletConnection = (data: ReadOnlyWalletConnectionData) => {
     dispatch({ type: "SET_READ_ONLY", payload: true });
     if (data.providerName) {
       handleExternalWalletConnection(data);

@@ -8,6 +8,7 @@ const IUEAFactoryABI = [
 type UEAOrigin = {
     owner: string;
     isUEA: boolean;
+    chainNamespace: string;
     chainId: string;
 };
 
@@ -26,14 +27,35 @@ const provider = new ethers.JsonRpcProvider(rpcURL, undefined, {
   polling: false,
 });
 
+const ueaOriginCache = new Map<string, UEAOrigin | null>();
+
 const useUEAOrigin = (addressHash: string | null | undefined): ReturnValue => {
-    const [ueaOrigin, setUEAOrigin] = useState<UEAOrigin | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const cacheKey = addressHash?.toLowerCase() ?? '';
+    const hasCachedOrigin = cacheKey ? ueaOriginCache.has(cacheKey) : false;
+
+    const [ueaOrigin, setUEAOrigin] = useState<UEAOrigin | null>(
+        () => (hasCachedOrigin ? ueaOriginCache.get(cacheKey) ?? null : null),
+    );
+    const [isLoading, setIsLoading] = useState(
+        () => !!cacheKey && !hasCachedOrigin,
+    );
 
     useEffect(() => {
-        if (!addressHash) return;
+        if (!addressHash || !cacheKey) {
+            setUEAOrigin(null);
+            setIsLoading(false);
+            return;
+        }
+
+        if (ueaOriginCache.has(cacheKey)) {
+            setUEAOrigin(ueaOriginCache.get(cacheKey) ?? null);
+            setIsLoading(false);
+            return;
+        }
 
         if (last429 !== 0 && Date.now() - last429 < COOLDOWN_MS) {
+            setUEAOrigin(null);
+            setIsLoading(false);
             return;
         }
 
@@ -59,11 +81,15 @@ const useUEAOrigin = (addressHash: string | null | undefined): ReturnValue => {
                 // Format owner as 0x string (if needed)
                 const ownerHex = ethers.hexlify(account.owner);
 
-                setUEAOrigin({
+                const origin = {
                     owner: ownerHex,
                     isUEA,
+                    chainNamespace: account.chainNamespace,
                     chainId: account.chainId,
-                });
+                };
+
+                ueaOriginCache.set(cacheKey, origin);
+                setUEAOrigin(origin);
             } catch (err) {
                 if (err?.status === 429) {
                     last429 = Date.now();
@@ -84,7 +110,7 @@ const useUEAOrigin = (addressHash: string | null | undefined): ReturnValue => {
         return () => {
             cancelled = true;
         };
-    }, [addressHash]);
+    }, [addressHash, cacheKey]);
 
     return { ueaOrigin, isLoading };
 };

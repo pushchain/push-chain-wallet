@@ -79,7 +79,7 @@ export const walletCategories: WalletCategoriesType[] = [
     wallet: "solana",
     label: "Connect Solana Wallet",
     icon: <Solana width={24} height={24} />,
-    isMobile: false,
+    isMobile: true,
   },
   {
     chain: ChainType.BASE,

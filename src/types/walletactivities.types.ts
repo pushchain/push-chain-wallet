@@ -1,20 +1,34 @@
 import { TransactionType } from "../modules/wallet/Wallet.types";
 
+export type WalletActivityAddress = {
+    hash: string;
+    name?: string;
+}
+
+export type WalletActivityTokenTransfer = {
+    from?: WalletActivityAddress | null;
+    to?: WalletActivityAddress | null;
+    token?: {
+        address?: string;
+        decimals?: string | number | null;
+        name?: string | null;
+        symbol?: string | null;
+        type?: string | null;
+    } | null;
+    total?: {
+        decimals?: string | number | null;
+        value?: string | number | bigint | null;
+    } | null;
+    type?: string;
+}
+
 export type WalletActivitiesResponse = {
     hash: string;
-    value: bigint;
-    from: {
-        hash: string;
-        name?: string;
-    };
-    to: {
-        hash: string;
-        name?: string;
-    } | null;
-    created_contract: {
-        hash: string;
-        name?: string;
-    } | null;
+    value: string | number | bigint;
+    from: WalletActivityAddress;
+    to: WalletActivityAddress | null;
+    created_contract: WalletActivityAddress | null;
+    token_transfers?: WalletActivityTokenTransfer[];
     timestamp: string;
     gas_used: string;
     fee: {

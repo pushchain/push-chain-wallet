@@ -1,36 +1,52 @@
 import { Box, DefaultChainMonotone, Doc, ExternalLinkIcon, InternalLink, PushChainMonotone, Text } from '../../../../blocks';
 import { css } from 'styled-components';
-import { convertCaipToObject, formatTokenValue, getFixedTime } from '../../Wallet.utils';
+import { convertCaipToObject, getFixedTime } from '../../Wallet.utils';
 import { centerMaskWalletAddress, CHAIN_MONOTONE_LOGO } from '../../../../common';
 
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { formatUnits } from 'viem';
 import useUEAOrigin from '../../../../hooks/useUEAOrigin';
 import { TransactionType } from '../../Wallet.types';
-import { WalletActivitiesResponse } from '../../../../types/walletactivities.types';
+import { WalletActivitiesResponse, WalletActivityTokenTransfer } from '../../../../types/walletactivities.types';
 
 type WalletActivityListItemProps = {
     transaction: WalletActivitiesResponse
-    address: string
+    addresses: string[]
 }
 
 const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
     transaction,
-    address
+    addresses,
 }) => {
+    const displayTransfer = getDisplayTransfer(transaction, addresses);
 
-    // This tells us the to part
-    const dataTo = transaction.to ? transaction.to : transaction.created_contract;
-    const { ueaOrigin, isLoading: isLoadingOrigin } = useUEAOrigin(dataTo?.hash);
-
-    let txTypes: Array<TransactionType>;
-    if (isLoadingOrigin && dataTo?.hash != null) {
-        txTypes = [];
-    } else if (ueaOrigin?.isUEA && dataTo?.hash != null) {
-        txTypes = ['universal_tx'];
-    } else {
-        txTypes = transaction.transaction_types;
-    }
+    const transactionTargetAddress =
+        getAddressHash(transaction.to) || getAddressHash(transaction.created_contract);
+    const counterpartyUEAAddress = getUEACheckAddress(displayTransfer.counterpartyAddress);
+    const targetUEAAddress = getUEACheckAddress(transactionTargetAddress);
+    const shouldCheckTargetOrigin =
+        !!targetUEAAddress &&
+        !isSameAddress(targetUEAAddress, counterpartyUEAAddress);
+    const {
+        ueaOrigin: counterpartyOrigin,
+        isLoading: isCounterpartyOriginLoading,
+    } = useUEAOrigin(counterpartyUEAAddress);
+    const {
+        ueaOrigin: targetOrigin,
+        isLoading: isTargetOriginLoading,
+    } = useUEAOrigin(shouldCheckTargetOrigin ? targetUEAAddress : undefined);
+    const isResolvingUniversalTransaction =
+        (!!counterpartyUEAAddress && isCounterpartyOriginLoading) ||
+        (shouldCheckTargetOrigin && isTargetOriginLoading);
+    const isUniversalTransaction =
+        transaction.transaction_types.includes('universal_tx') ||
+        !!counterpartyOrigin?.isUEA ||
+        !!targetOrigin?.isUEA;
+    const counterpartyAddress =
+        getUEAOriginDisplayAddress(counterpartyOrigin) ||
+        displayTransfer.counterpartyAddress ||
+        getUEAOriginDisplayAddress(targetOrigin) ||
+        '';
 
     function getChainIcon(chainId) {
         if (chainId == null) {
@@ -45,46 +61,6 @@ const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
         } else {
             return <DefaultChainMonotone size={20} />;
         }
-    }
-
-    function fetchChainFromAddress(transaction: WalletActivitiesResponse) {
-
-        let displayAddress = '';
-        if (address === transaction.from.hash) {
-            const dataTo = transaction.to ? transaction.to.hash : transaction.created_contract.hash;
-            displayAddress = dataTo;
-        }
-
-        if (address === transaction.to?.hash) {
-            const recipients = transaction.from.hash;
-            displayAddress = recipients;
-        }
-
-        const { result } = convertCaipToObject(displayAddress);
-
-        if (result.address) {
-            return (
-                <Box display="flex" gap="spacing-xxs" alignItems='center'>
-                    <Box
-                        height="18px"
-                        width="18px"
-                        backgroundColor="pw-int-bg-tertiary-color"
-                        borderRadius="radius-xxxs"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                    >
-                        {getChainIcon(result.chainId)}
-                    </Box>
-
-                    <Text color="pw-int-text-secondary-color" variant="bes-semibold">
-                        {centerMaskWalletAddress(result.address)}
-                    </Text>
-                </Box>
-            )
-        }
-
-
     }
 
     return (
@@ -108,23 +84,30 @@ const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
                     width="32px"
                     height="32px"
                 >
-                    {address === transaction.from.hash && transaction.to && (
+                    {displayTransfer.direction === 'out' && (
                         <ExternalLinkIcon size={16} color="pw-int-icon-brand-color" />
                     )}
-                    {address === transaction.to?.hash && (
+                    {displayTransfer.direction === 'in' && (
                         <InternalLink size={16} color="pw-int-icon-success-bold-color" />
                     )}
-                    {transaction.to == null && transaction.created_contract && (
+                    {(displayTransfer.direction === 'contract' || displayTransfer.direction === 'unknown') && (
                         <Doc size={16} color="pw-int-icon-tertiary-color" />
                     )}
                 </Box>
                 <Box display="flex" flexDirection="column" gap='spacing-xxxs'>
-                    {showTxType(txTypes, address, transaction)}
-                    {fetchChainFromAddress(transaction)}
+                    {showTxType(
+                        transaction.transaction_types,
+                        displayTransfer.direction,
+                        isUniversalTransaction,
+                        isResolvingUniversalTransaction,
+                    )}
+                    {renderCounterparty(counterpartyAddress, getChainIcon)}
                 </Box>
             </Box>
             <Box display="flex" flexDirection="column" gap="spacing-xxxs">
-                <Text variant="bes-regular" textAlign='right'>{formatTokenValue(formatUnits(transaction.value, 18), 2)} PC</Text>
+                <Text variant="bes-regular" textAlign='right'>
+                    {displayTransfer.formattedValue} {displayTransfer.symbol}
+                </Text>
                 <Text variant="c-semibold" color='pw-int-icon-tertiary-color' textAlign='right'>{getFixedTime(transaction.timestamp)}</Text>
             </Box>
 
@@ -134,12 +117,259 @@ const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
 
 export { WalletActivityListItem };
 
+type DisplayDirection = 'in' | 'out' | 'contract' | 'unknown';
+
+type DisplayTransfer = {
+    counterpartyAddress: string;
+    direction: DisplayDirection;
+    formattedValue: string;
+    symbol: string;
+}
+
+const normalizeAddress = (value?: string | null) => {
+    if (!value) return '';
+
+    return convertCaipToObject(value).result.address.toLowerCase();
+}
+
+const isSameAddress = (a?: string | null, b?: string | null) =>
+    !!a && !!b && normalizeAddress(a) === normalizeAddress(b);
+
+const isTrackedWalletAddress = (
+    walletAddresses: string[],
+    address?: string | null,
+) =>
+    walletAddresses.some((walletAddress) => isSameAddress(walletAddress, address));
+
+const getAddressHash = (addressInfo?: { hash?: string | null } | null) =>
+    addressInfo?.hash ?? '';
+
+const getUEACheckAddress = (address?: string | null) => {
+    if (!address) return undefined;
+
+    const { result } = convertCaipToObject(address);
+
+    return /^0x[0-9a-fA-F]{40}$/.test(result.address)
+        ? result.address
+        : undefined;
+}
+
+const normalizeDecimals = (decimals?: string | number | null) => {
+    const parsedDecimals = Number(decimals);
+    return Number.isFinite(parsedDecimals) ? parsedDecimals : 18;
+}
+
+const addIntegerGrouping = (value: string) =>
+    value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const formatDecimalValue = (value: string) => {
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) return '0';
+
+    if (normalizedValue.includes('e')) {
+        return Number(normalizedValue).toLocaleString(undefined, {
+            maximumFractionDigits: 18,
+        });
+    }
+
+    const sign = normalizedValue.startsWith('-') ? '-' : '';
+    const unsignedValue = sign ? normalizedValue.slice(1) : normalizedValue;
+    const [integerPart = '0', fractionPart = ''] = unsignedValue.split('.');
+    const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '') || '0';
+
+    if (!fractionPart || Number(fractionPart) === 0) {
+        return `${sign}${addIntegerGrouping(normalizedInteger)}`;
+    }
+
+    const firstNonZeroIndex = fractionPart.search(/[1-9]/);
+
+    if (firstNonZeroIndex === -1) {
+        return `${sign}${addIntegerGrouping(normalizedInteger)}`;
+    }
+
+    const hasWholeValue = normalizedInteger !== '0';
+    const fractionDigits = hasWholeValue ? 2 : Math.max(2, firstNonZeroIndex + 2);
+    const truncatedFraction = fractionPart
+        .slice(0, fractionDigits)
+        .replace(/0+$/, '');
+
+    if (!truncatedFraction) {
+        return `${sign}${addIntegerGrouping(normalizedInteger)}`;
+    }
+
+    return `${sign}${addIntegerGrouping(normalizedInteger)}.${truncatedFraction}`;
+}
+
+const formatRawTokenValue = (
+    value?: string | number | bigint | null,
+    decimals: number = 18,
+) => {
+    const rawValue = String(value ?? '0').trim();
+
+    if (!rawValue) return '0';
+
+    if (!/^\d+$/.test(rawValue)) {
+        return formatDecimalValue(rawValue);
+    }
+
+    return formatDecimalValue(formatUnits(BigInt(rawValue), decimals));
+}
+
+const getRelevantTokenTransfer = (
+    transaction: WalletActivitiesResponse,
+    walletAddresses: string[],
+) => {
+    const tokenTransfers = transaction.token_transfers ?? [];
+
+    return (
+        tokenTransfers.find((transfer) =>
+            isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.from)) ||
+            isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.to))
+        ) ?? tokenTransfers[0]
+    );
+}
+
+const getTokenTransferDirection = (
+    transfer: WalletActivityTokenTransfer,
+    walletAddresses: string[],
+): DisplayDirection => {
+    if (isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.from))) return 'out';
+    if (isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.to))) return 'in';
+
+    return 'unknown';
+}
+
+const getTransactionDirection = (
+    transaction: WalletActivitiesResponse,
+    walletAddresses: string[],
+): DisplayDirection => {
+    if (isTrackedWalletAddress(walletAddresses, transaction.from?.hash) && transaction.to) return 'out';
+    if (isTrackedWalletAddress(walletAddresses, transaction.to?.hash)) return 'in';
+    if (!transaction.to && transaction.created_contract) return 'contract';
+
+    return 'unknown';
+}
+
+const getDisplayTransfer = (
+    transaction: WalletActivitiesResponse,
+    walletAddresses: string[],
+): DisplayTransfer => {
+    const tokenTransfer = getRelevantTokenTransfer(transaction, walletAddresses);
+
+    if (tokenTransfer) {
+        const direction = getTokenTransferDirection(tokenTransfer, walletAddresses);
+        const counterpartyAddress =
+            direction === 'out'
+                ? getAddressHash(tokenTransfer.to)
+                : direction === 'in'
+                    ? getAddressHash(tokenTransfer.from)
+                    : getAddressHash(tokenTransfer.to) || getAddressHash(tokenTransfer.from);
+        const decimals = normalizeDecimals(
+            tokenTransfer.total?.decimals ?? tokenTransfer.token?.decimals,
+        );
+        const symbol = tokenTransfer.token?.symbol || 'Token';
+
+        return {
+            counterpartyAddress,
+            direction,
+            formattedValue: formatRawTokenValue(tokenTransfer.total?.value, decimals),
+            symbol,
+        };
+    }
+
+    const direction = getTransactionDirection(transaction, walletAddresses);
+    const counterpartyAddress =
+        direction === 'out'
+            ? getAddressHash(transaction.to) || getAddressHash(transaction.created_contract)
+            : direction === 'in'
+                ? getAddressHash(transaction.from)
+                : getAddressHash(transaction.created_contract) || getAddressHash(transaction.to);
+
+    return {
+        counterpartyAddress,
+        direction,
+        formattedValue: formatRawTokenValue(transaction.value, 18),
+        symbol: 'PC',
+    };
+}
+
+const normalizeOriginOwner = (owner: string, chainNamespace?: string) => {
+    const isEvmOrigin = chainNamespace === 'eip155' || chainNamespace === 'ethereum';
+
+    if (isEvmOrigin && /^0x[0-9a-fA-F]{64}$/.test(owner)) {
+        return `0x${owner.slice(-40)}`;
+    }
+
+    return owner;
+}
+
+const getUEAOriginDisplayAddress = (
+    ueaOrigin?: {
+        owner: string;
+        isUEA: boolean;
+        chainNamespace?: string;
+        chainId?: string;
+    } | null,
+) => {
+    if (!ueaOrigin?.isUEA) return null;
+
+    const owner = normalizeOriginOwner(
+        ueaOrigin.owner,
+        ueaOrigin.chainNamespace,
+    );
+
+    if (!ueaOrigin.chainNamespace || !ueaOrigin.chainId) return owner;
+
+    return `${ueaOrigin.chainNamespace}:${ueaOrigin.chainId}:${owner}`;
+}
+
+const renderCounterparty = (
+    displayAddress: string,
+    getChainIcon: (chainId: string | null) => ReactNode,
+) => {
+    if (!displayAddress) return null;
+
+    const { result } = convertCaipToObject(displayAddress);
+    const addressToShow = result.address ?? displayAddress;
+
+    if (!addressToShow) return null;
+
+    return (
+        <Box display="flex" gap="spacing-xxs" alignItems='center'>
+            <Box
+                height="18px"
+                width="18px"
+                backgroundColor="pw-int-bg-tertiary-color"
+                borderRadius="radius-xxxs"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+            >
+                {getChainIcon(result.chainId)}
+            </Box>
+
+            <Text color="pw-int-text-secondary-color" variant="bes-semibold">
+                {centerMaskWalletAddress(addressToShow)}
+            </Text>
+        </Box>
+    );
+}
 
 const showTxType = (
     types: Array<TransactionType>,
-    address?: string,
-    transaction?: WalletActivitiesResponse
+    direction?: DisplayDirection,
+    isUniversalTransaction?: boolean,
+    isResolvingUniversalTransaction?: boolean,
 ) => {
+    if (isUniversalTransaction) {
+        return <Text variant="bm-regular">Universal Transaction</Text>;
+    }
+
+    if (isResolvingUniversalTransaction) {
+        return <Text variant="bm-regular">Transaction</Text>;
+    }
+
     const TYPES_ORDER: Array<TransactionType> = [
         'blob_transaction',
         'token_creation',
@@ -152,7 +382,7 @@ const showTxType = (
 
     let label;
 
-    const typeToShow = types.sort((t1, t2) => TYPES_ORDER.indexOf(t1) - TYPES_ORDER.indexOf(t2))[0];
+    const typeToShow = [...types].sort((t1, t2) => TYPES_ORDER.indexOf(t1) - TYPES_ORDER.indexOf(t2))[0];
 
     switch (typeToShow) {
         case 'universal_tx':
@@ -168,20 +398,22 @@ const showTxType = (
             label = 'Contract Creation';
             break;
         case 'token_transfer':
-            label = 'Token Transfer';
+            if (direction === 'out') {
+                label = 'Send';
+            } else if (direction === 'in') {
+                label = 'Receive';
+            } else {
+                label = 'Token Transfer';
+            }
             break;
         case 'token_creation':
             label = 'Token Creation';
             break;
         case 'coin_transfer':
-            if (address && transaction) {
-                if (address === transaction.from?.hash) {
-                    label = 'Send';
-                } else if (address === transaction.to?.hash) {
-                    label = 'Receive';
-                } else {
-                    label = 'Coin Transfer';
-                }
+            if (direction === 'out') {
+                label = 'Send';
+            } else if (direction === 'in') {
+                label = 'Receive';
             } else {
                 label = 'Coin Transfer';
             }

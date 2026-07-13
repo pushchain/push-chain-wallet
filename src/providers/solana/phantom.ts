@@ -2,15 +2,22 @@ import { getAddress } from "ethers";
 import { ChainType, ITypedData } from "../../types/wallet.types";
 import { BaseWalletProvider } from "../BaseWalletProvider";
 import * as chains from "viem/chains";
-import { Transaction } from '@solana/web3.js';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { bytesToHex, createWalletClient, custom, hexToBytes, parseTransaction } from "viem";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import {
+  isMobileDevice,
+  isPhantomMobileHandoffEnabled,
+  openPhantomMobileBrowser,
+  shouldOpenPhantomMobileBrowser,
+} from "./phantomMobile";
+
 declare global {
   interface Window {
     phantom?: {
       ethereum?: {
         isConnected?: boolean;
-        request: (args: { method: string; params?: any[] }) => Promise<any>;
+        request: <T = unknown>(args: { method: string; params?: unknown[] }) => Promise<T>;
       };
       solana?: {
         isConnected?: boolean;
@@ -21,7 +28,9 @@ declare global {
           message: Uint8Array,
           encoding: string
         ) => Promise<{ signature: Uint8Array }>;
-        signAndSendTransaction: (txn: Transaction) => Promise<string>;
+        signAndSendTransaction: (
+          txn: Transaction | VersionedTransaction
+        ) => Promise<{ signature: string }>;
       };
     };
   }
@@ -39,7 +48,9 @@ export class PhantomProvider extends BaseWalletProvider {
 
   isInstalled = async (): Promise<boolean> => {
     return (
-      typeof window !== "undefined" && typeof window.phantom !== "undefined"
+      typeof window !== "undefined" &&
+      (typeof window.phantom !== "undefined" ||
+        (isMobileDevice() && isPhantomMobileHandoffEnabled()))
     );
   };
 
@@ -49,7 +60,7 @@ export class PhantomProvider extends BaseWalletProvider {
     }
 
     const provider = window.phantom?.ethereum;
-    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    const accounts = await provider.request<string[]>({ method: 'eth_requestAccounts' });
     const rawAddress = accounts[0];
 
     const checksumAddress = getAddress(rawAddress);
@@ -64,6 +75,11 @@ export class PhantomProvider extends BaseWalletProvider {
 
   private connectSolana = async (): Promise<{ caipAddress: string }> => {
     if (!window.phantom?.solana) {
+      if (shouldOpenPhantomMobileBrowser(ChainType.SOLANA)) {
+        openPhantomMobileBrowser(ChainType.SOLANA);
+        return new Promise<{ caipAddress: string }>(() => undefined);
+      }
+
       throw new Error('Phantom not installed for Solana');
     }
 
@@ -102,7 +118,7 @@ export class PhantomProvider extends BaseWalletProvider {
     if (chainType === ChainType.ETHEREUM) {
       const provider = window.phantom?.ethereum;
       if (!provider) throw new Error('No Phantom Ethereum wallet connected');
-      const chainId = await provider.request({ method: 'eth_chainId' }) as string;
+      const chainId = await provider.request<string>({ method: 'eth_chainId' });
       return parseInt(chainId, 16);
     } else if (chainType === ChainType.SOLANA) {
       const provider = window.phantom?.solana;
@@ -153,7 +169,7 @@ export class PhantomProvider extends BaseWalletProvider {
   }
 
   signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
-    const isInstalled = this.isInstalled();
+    const isInstalled = await this.isInstalled();
     if (!isInstalled) {
       throw new Error('No Phantom wallet installed');
     }
@@ -172,7 +188,7 @@ export class PhantomProvider extends BaseWalletProvider {
       try {
         const provider = window.phantom?.ethereum;
 
-        const accounts = await provider.request({
+        const accounts = await provider.request<string[]>({
           method: 'eth_accounts',
         });
 
@@ -182,12 +198,12 @@ export class PhantomProvider extends BaseWalletProvider {
 
         const hexMessage = bytesToHex(message);
 
-        const signature = await provider.request({
+        const signature = await provider.request<`0x${string}`>({
           method: 'personal_sign',
           params: [hexMessage, accounts[0]],
         });
 
-        return hexToBytes(signature as `0x${string}`);
+        return hexToBytes(signature);
       } catch (error) {
         console.error('Phantom Ethereum signing error:', error);
         throw error;
@@ -198,7 +214,7 @@ export class PhantomProvider extends BaseWalletProvider {
   };
 
   signAndSendTransaction = async (txn: Uint8Array): Promise<Uint8Array> => {
-    const isInstalled = this.isInstalled();
+    const isInstalled = await this.isInstalled();
     if (!isInstalled) {
       throw new Error('No Phantom wallet installed');
     }
@@ -207,12 +223,19 @@ export class PhantomProvider extends BaseWalletProvider {
       try {
         const provider = window.phantom?.solana;
 
-        const transaction = Transaction.from(txn);
+        const deserialized = VersionedTransaction.deserialize(txn);
+        let transaction: Transaction | VersionedTransaction;
+        if (deserialized.message.version === 'legacy') {
+          transaction = Transaction.from(txn);
+        } else {
+          transaction = deserialized;
+        }
+
         const signedTransaction = await provider.signAndSendTransaction(
           transaction
         );
 
-        return bs58.decode((signedTransaction as any).signature);
+        return bs58.decode(signedTransaction.signature);
       } catch (error) {
         console.error('Phantom Solana signing error:', error);
         throw error;
@@ -221,7 +244,7 @@ export class PhantomProvider extends BaseWalletProvider {
       try {
         const provider = window.phantom?.ethereum;
 
-        const accounts = await provider.request({
+        const accounts = await provider.request<string[]>({
           method: 'eth_accounts',
         });
 
@@ -246,12 +269,12 @@ export class PhantomProvider extends BaseWalletProvider {
             : undefined,
         };
 
-        const signature = await provider.request({
+        const signature = await provider.request<`0x${string}`>({
           method: 'eth_sendTransaction',
           params: [txParams],
         });
 
-        return hexToBytes(signature as `0x${string}`);
+        return hexToBytes(signature);
       } catch (error) {
         console.error('Phantom Ethereum signing error:', error);
         throw error;
@@ -262,7 +285,7 @@ export class PhantomProvider extends BaseWalletProvider {
   };
 
   signTypedData = async (typedData: ITypedData): Promise<Uint8Array> => {
-    const isInstalled = this.isInstalled();
+    const isInstalled = await this.isInstalled();
     if (!isInstalled) {
       throw new Error('No Phantom wallet installed');
     }
@@ -300,7 +323,7 @@ export class PhantomProvider extends BaseWalletProvider {
   }
 
   disconnect = async (): Promise<void> => {
-    const isInstalled = this.isInstalled();
+    const isInstalled = await this.isInstalled();
     if (!isInstalled) return;
 
     if (this.connectedChainType === ChainType.SOLANA && window.phantom?.solana) {
