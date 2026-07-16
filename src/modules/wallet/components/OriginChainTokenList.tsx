@@ -1,42 +1,29 @@
 import { Box, Text } from 'blocks';
-import { useMemo } from 'react';
 import { OriginChainTokenListItem } from './OriginChainTokenListItem';
 import { convertCaipToObject } from '../Wallet.utils';
 import { css } from 'styled-components';
-import { TOKEN_LISTS } from '../../../helpers/TokenHelper';
 import { TokenFormat, WalletType } from '../../../types';
+import { getOriginChainTokens } from './sendComponent/tokenSearch';
 
 const OriginChainTokenList = ({
     originWalletAddress,
     showFaucet,
     hideHeader,
-    handleSelectToken
+    handleSelectToken,
+    tokens: tokensOverride,
 }: {
     originWalletAddress: string
     showFaucet?: boolean
     hideHeader?: boolean
     handleSelectToken?: (token: TokenFormat, walletDetails: WalletType) => void
+    tokens?: TokenFormat[]
 }) => {
 
     const { result } = convertCaipToObject(originWalletAddress);
 
-    const tokens = useMemo(() => {
-        const chainNs = result.chain?.toLowerCase();
-        const chainId = Number(result.chainId);
+    const tokens = tokensOverride ?? getOriginChainTokens(result);
 
-        if (chainNs === 'solana') return TOKEN_LISTS.SOLANA;
-
-        // EVM chains
-        if (chainNs === 'eip155' || chainNs === 'ethereum') {
-            switch (chainId) {
-                case 11155111: return TOKEN_LISTS.ETHEREUM;
-                case 84532:    return TOKEN_LISTS.BASE;
-                case 421614:   return TOKEN_LISTS.ARBITRUM;
-                case 97:       return TOKEN_LISTS.BINANCE;
-                default:       return TOKEN_LISTS.ETHEREUM;
-            }
-        }
-    }, [result.chain, result.chainId]);
+    if (!tokens.length) return null;
 
     return (
         <Box

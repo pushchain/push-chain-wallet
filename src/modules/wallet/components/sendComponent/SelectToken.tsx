@@ -14,6 +14,7 @@ import { convertCaipToObject, getWalletlist } from "../../Wallet.utils";
 import { PushChain } from "@pushchain/core";
 import OriginChainTokenList from "../OriginChainTokenList";
 import { usePushChain } from "../../../../context/PushChainContext";
+import { filterTokensByQuery, getOriginChainTokens } from "./tokenSearch";
 
 type SelectTokenProps = {
   handleTokenSelection: (tokenDetails: TokenDetails) => void;
@@ -37,20 +38,6 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
 
   const { result } = useMemo(() => convertCaipToObject(parsedWallet), [parsedWallet]);
 
-  const availableTokens = useMemo(() => {
-    const dedupedTokens = new Map<string, TokenFormat>();
-
-    [...tokens, ...prc20Tokens].forEach((token) => {
-      const tokenKey = token.address ? token.address.toLowerCase() : "native-token";
-
-      if (!dedupedTokens.has(tokenKey)) {
-        dedupedTokens.set(tokenKey, token);
-      }
-    });
-
-    return Array.from(dedupedTokens.values());
-  }, [tokens, prc20Tokens]);
-
   const otherTokens = useMemo(() => {
       return tokens.filter((t) => {
           const addr = (t?.address ?? '').toLowerCase();
@@ -60,28 +47,40 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
       });
   }, [tokens, moveableTokens, prc20Tokens]);
 
-  const filteredTokens = useMemo(() => {
-    const trimmedQuery = searchQuery.trim().toLowerCase();
-    const tokensToFilter = searchedToken
-      ? [
-          searchedToken,
-          ...availableTokens.filter(
-            (token) => token.address.toLowerCase() !== searchedToken.address.toLowerCase()
-          ),
-        ]
-      : availableTokens;
-
-    if (!trimmedQuery) {
-      return tokensToFilter;
-    }
-
-    return tokensToFilter.filter(
-      (token) =>
-        token.address.toLowerCase().includes(trimmedQuery) ||
-        token.name.toLowerCase().includes(trimmedQuery) ||
-        token.symbol.toLowerCase().includes(trimmedQuery)
-    );
-  }, [availableTokens, searchQuery, searchedToken]);
+  const shouldShowOriginTokens = executorAddress !== result.address;
+  const originTokens = useMemo(
+    () => shouldShowOriginTokens ? getOriginChainTokens(result) : [],
+    [result, shouldShowOriginTokens],
+  );
+  const filteredOriginTokens = useMemo(
+    () => filterTokensByQuery(originTokens, searchQuery),
+    [originTokens, searchQuery],
+  );
+  const filteredOtherTokens = useMemo(
+    () => filterTokensByQuery(otherTokens, searchQuery),
+    [otherTokens, searchQuery],
+  );
+  const filteredMoveableTokens = useMemo(
+    () => filterTokensByQuery(moveableTokens, searchQuery),
+    [moveableTokens, searchQuery],
+  );
+  const filteredPrc20Tokens = useMemo(
+    () => filterTokensByQuery(prc20Tokens, searchQuery),
+    [prc20Tokens, searchQuery],
+  );
+  const knownTokens = useMemo(
+    () => [...originTokens, ...tokens, ...moveableTokens, ...prc20Tokens],
+    [originTokens, tokens, moveableTokens, prc20Tokens],
+  );
+  const isNewSearchedToken = !!searchedToken?.address && !knownTokens.some(
+    (token) => token.address?.toLowerCase() === searchedToken.address.toLowerCase(),
+  );
+  const hasMatchingTokens =
+    filteredOriginTokens.length > 0 ||
+    filteredOtherTokens.length > 0 ||
+    filteredMoveableTokens.length > 0 ||
+    filteredPrc20Tokens.length > 0 ||
+    isNewSearchedToken;
 
   const handleSearch = async () => {
     const trimmedQuery = searchQuery.trim();
@@ -93,7 +92,7 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
       return;
     }
 
-    const existingToken = availableTokens.find(
+    const existingToken = knownTokens.find(
       (token) => token.address && token.address.toLowerCase() === trimmedQuery.toLowerCase()
     );
 
@@ -103,9 +102,6 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
     }
 
     if (!isAddress(trimmedQuery)) {
-      if (!filteredTokens.length) {
-        setSearchError("No token found. Enter a valid token address to search.");
-      }
       return;
     }
 
@@ -151,10 +147,7 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setSearchError("");
-
-              if (!e.target.value.trim()) {
-                setSearchedToken(null);
-              }
+              setSearchedToken(null);
             }}
             icon={<Search />}
             placeholder="Search Token..."
@@ -192,16 +185,10 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
             customScrollbar
           >
             {loadingTokenDetails && <Spinner size="large" variant="primary" />}
-            {/* {filteredTokens.map((token: TokenFormat) => (
-              <TokensListItem
-                token={token}
-                key={token.address || token.symbol}
-                handleSelectToken={handleTokenSelection}
-              />
-            ))} */}
-            {executorAddress !== result.address && (
+            {filteredOriginTokens.length > 0 && (
                 <OriginChainTokenList
                     originWalletAddress={parsedWallet}
+                    tokens={filteredOriginTokens}
                     hideHeader
                     handleSelectToken={(_token, walletDetails) =>
                         handleTokenSelection({
@@ -214,7 +201,7 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                     }
                 />
             )}
-            {otherTokens.map((token: TokenFormat) => (
+            {filteredOtherTokens.map((token: TokenFormat) => (
                 <TokensListItem
                     token={token}
                     key={token.address}
@@ -222,15 +209,28 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                     handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false, source: 'push' })}
                 />
             ))}
-            {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+            {filteredMoveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
               .map((token: TokenFormat) => (
                   <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => handleTokenSelection({ token, chainId: result.chainId, native: false, source: 'origin', sourceWallet: result })} />
             ))}
-            {prc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+            {filteredPrc20Tokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
               .map((token: TokenFormat) => (
                   <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => handleTokenSelection({ token, chainId: '42101', native: false, source: 'push' })} />
             ))}
-            {!loadingTokenDetails && !filteredTokens.length && !searchError && (
+            {isNewSearchedToken && (
+              <TokensListItem
+                token={searchedToken}
+                key={searchedToken.address}
+                walletDetails={null}
+                handleSelectToken={() => handleTokenSelection({
+                  token: searchedToken,
+                  chainId: '42101',
+                  native: false,
+                  source: 'push',
+                })}
+              />
+            )}
+            {!loadingTokenDetails && !hasMatchingTokens && !searchError && (
               <Text variant="bs-regular" color="pw-int-text-secondary-color">
                 No matching tokens yet. Enter a contract address and press Enter to load one.
               </Text>
