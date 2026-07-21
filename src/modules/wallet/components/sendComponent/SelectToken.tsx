@@ -190,9 +190,9 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                     originWalletAddress={parsedWallet}
                     tokens={filteredOriginTokens}
                     hideHeader
-                    handleSelectToken={(_token, walletDetails) =>
+                    handleSelectToken={(token, walletDetails) =>
                         handleTokenSelection({
-                            token: null,
+                            token,
                             chainId: walletDetails.chainId,
                             native: true,
                             source: 'origin',

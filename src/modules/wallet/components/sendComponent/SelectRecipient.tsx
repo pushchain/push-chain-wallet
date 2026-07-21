@@ -8,6 +8,7 @@ import { useTokenBalance } from "../../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../../context/PushChainContext";
 import { getChainIcon } from "../OriginChainTokenListItem";
 import { useState } from "react";
+import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
 
 type RecipientNetworkSelectorProps = {
   canSelectDestinationNetwork: boolean;
@@ -124,13 +125,13 @@ const SelectRecipient = () => {
     setAmount,
     setSendState,
     setTokenDetails,
-    nativeToken,
     nativeBalance,
     loadingNativeBalance,
     destinationNetworkOptions,
     selectedDestinationNetwork,
     setDestinationNetwork,
-    canSelectDestinationNetwork
+    canSelectDestinationNetwork,
+    trackingMetadata,
   } = useSendTokenContext();
 
   const { setActiveState } = useWalletDashboard();
@@ -155,9 +156,8 @@ const SelectRecipient = () => {
 
   const balance = tokenDetails.native ? nativeBalance : hasLoadedTokenBalance ? tokenSelected?.balance : tokenBalance;
   const loadingBalance = tokenDetails.native ? loadingNativeBalance : hasLoadedTokenBalance ? false : loadingTokenBalance;
-  const tokenSymbol = tokenSelected?.symbol || nativeToken?.symbol || '';
+  const tokenSymbol = tokenSelected?.symbol || '';
   const shouldShowTokenLogo = !tokenDetails.native || !!tokenSelected;
-
   return (
     <>
       <WalletHeader
@@ -221,7 +221,7 @@ const SelectRecipient = () => {
             }
             <Box display="flex" flexDirection="column">
               <Text variant="bm-semibold" color="pw-int-text-primary-color">
-                {tokenSelected?.name || nativeToken?.name || ''}
+                {tokenSelected?.name || ''}
               </Text>
               <Text variant="bs-regular" color="pw-int-text-secondary-color">
                 {loadingBalance ? ('0') : Number(truncateToDecimals(Number(balance ?? '0'), 3)).toLocaleString()} {" "} {tokenSymbol}
@@ -298,7 +298,10 @@ const SelectRecipient = () => {
               alignItems="center"
               backgroundColor="pw-int-bg-secondary-color"
               borderRadius="radius-md"
-              onClick={() => setAmount(truncateToDecimals(Number(balance), 3).toString())}
+              onClick={() => {
+                const maxAmount = truncateToDecimals(Number(balance), 3).toString();
+                setAmount(maxAmount);
+              }}
               cursor="pointer"
             >
               <Text variant="bs-semibold" color="pw-int-text-primary-color">
@@ -353,6 +356,22 @@ const SelectRecipient = () => {
           <Button
             onClick={() => {
               if (receiverAddress && amount && !isNaN(Number(amount)) && Number(amount) > 0 && Number(amount) <= Number(balance)) {
+                const metadata = trackingMetadata;
+                trackWalletEvent(WALLET_EVENTS.SEND_RECIPIENT_ENTERED, {
+                  ...metadata,
+                  recipientAddress: receiverAddress.trim(),
+                  step: 'recipient_entered',
+                });
+                trackWalletEvent(WALLET_EVENTS.SEND_AMOUNT_ENTERED, {
+                  ...metadata,
+                  amount: amount.trim(),
+                  step: 'amount_entered',
+                });
+                trackWalletEvent(WALLET_EVENTS.SEND_RECIPIENT_CHAIN_SELECTED, {
+                  ...metadata,
+                  destinationChainId: selectedDestinationNetwork.chainId ?? undefined,
+                  step: 'recipient_chain_selected',
+                });
                 setSendState("review");
               }
             }}

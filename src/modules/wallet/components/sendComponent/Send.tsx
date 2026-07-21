@@ -5,11 +5,29 @@ import SelectRecipient from './SelectRecipient';
 import Review from './Review';
 import Confirmation from './Confirmation';
 import { SendTokenProvider, TokenDetails, useSendTokenContext } from '../../../../context/SendTokenContext';
+import {
+    buildSendEventMetadata,
+    trackWalletEvent,
+    WALLET_EVENTS,
+} from '../../../../analytics/walletEvents';
 
 const SendContent = () => {
-    const { sendState, setSendState, setTokenDetails } = useSendTokenContext();
+    const {
+        sendState,
+        setSendState,
+        setTokenDetails,
+        walletAddress,
+    } = useSendTokenContext();
 
     const handleTokenSelection = (tokenDetails: TokenDetails) => {
+        const metadata = buildSendEventMetadata({
+            walletAddress,
+            tokenDetails,
+        });
+        trackWalletEvent(WALLET_EVENTS.SEND_TOKEN_SELECTED, {
+            ...metadata,
+            step: 'token_selected',
+        });
         setTokenDetails(tokenDetails);
         setSendState('selectRecipient');
     }

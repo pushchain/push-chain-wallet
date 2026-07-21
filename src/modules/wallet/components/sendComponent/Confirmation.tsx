@@ -5,9 +5,10 @@ import { centerMaskWalletAddress, EXPLORER_URL } from "common";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
+import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
 
 const Confirmation = () => {
-  const { walletAddress, tokenDetails, receiverAddress, amount, txhash, setTxhash, nativeToken, selectedDestinationNetwork } =
+  const { walletAddress, tokenDetails, receiverAddress, amount, txhash, setTxhash, selectedDestinationNetwork, trackingMetadata } =
     useSendTokenContext();
   const { setActiveState } =
     useWalletDashboard();
@@ -32,6 +33,10 @@ const Confirmation = () => {
   };
 
   const handleExplorerButton = () => {
+    trackWalletEvent(WALLET_EVENTS.SEND_VIEW_TRANSACTION_CLICKED, {
+      ...trackingMetadata,
+      step: 'view_transaction',
+    });
     window.open(`${EXPLORER_URL}/tx/${txhash}`, "_blank");
   };
 
@@ -82,7 +87,7 @@ const Confirmation = () => {
                 color="pw-int-icon-danger-bold-color"
               />}
               <Text variant="h2-semibold" color="pw-int-text-primary-color">
-                {Number(amount) || amount} {tokenDetails.token?.symbol || nativeToken?.symbol || ''}
+                {Number(amount) || amount} {tokenDetails.token?.symbol || ''}
               </Text>
             </Box>
             {/* <Text color="pw-int-text-secondary-color" variant="bs-regular">

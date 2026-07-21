@@ -5,6 +5,7 @@ import { css } from "styled-components";
 import { useSendTokenContext } from "../../../../context/SendTokenContext";
 import WalletHeader from "../dashboard/WalletHeader";
 import { fetchGasPriceInGwei } from '../../../../utils/viemClient';
+import { trackWalletEvent, WALLET_EVENTS } from '../../../../analytics/walletEvents';
 
 const Review = () => {
   const {
@@ -16,8 +17,8 @@ const Review = () => {
     sendingTransaction,
     setSendState,
     txError,
-    nativeToken,
-    selectedDestinationNetwork
+    selectedDestinationNetwork,
+    trackingMetadata,
   } = useSendTokenContext();
 
   const [networkFee, setNetworkFee] = React.useState<string | null>(null);
@@ -44,6 +45,16 @@ const Review = () => {
       mounted = false;
     };
   }, []);
+
+  const handleConfirm = () => {
+    if (sendingTransaction) return;
+
+    trackWalletEvent(WALLET_EVENTS.SEND_CONFIRM_CLICKED, {
+      ...trackingMetadata,
+      step: 'confirm',
+    });
+    handleSendTransaction();
+  };
 
   return (
     <>
@@ -104,7 +115,7 @@ const Review = () => {
             >
               <SendNotification size={48} color="pw-int-icon-brand-color" />
               <Text variant="h2-semibold" color="pw-int-text-primary-color">
-                {Number(amount) || amount} {tokenDetails.token?.symbol || nativeToken?.symbol || ''}
+                {Number(amount) || amount} {tokenDetails.token?.symbol || ''}
               </Text>
             </Box>
             {/* <Text color="pw-int-text-secondary-color" variant="bs-regular">
@@ -175,7 +186,7 @@ const Review = () => {
           `}
         >
           <Button
-            onClick={handleSendTransaction}
+            onClick={handleConfirm}
             block
             loading={sendingTransaction}
           >

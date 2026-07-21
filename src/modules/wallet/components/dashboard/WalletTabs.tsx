@@ -5,6 +5,7 @@ import { WalletActivityList } from "./WalletActivityList";
 import { TokensList } from "../TokensList";
 import { SubAccountsList } from "../SubAccountsList";
 import { ActiveStates, WalletListType } from "../../../../types";
+import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
 
 type WalletTabKey = 'tokens' | 'activity' | 'subAccounts' | 'rewards' | 'wallets';
 
@@ -27,9 +28,23 @@ const WalletTabs: FC<WalletTabsProps> = ({
   const [activeTab, setActiveTab] = useState<WalletTabKey>('tokens');
 
   const handleTabChange = (activeKey: string) => {
-    if (WALLET_TAB_KEYS.includes(activeKey as WalletTabKey)) {
-      setActiveTab(activeKey as WalletTabKey);
+    if (!WALLET_TAB_KEYS.includes(activeKey as WalletTabKey) || activeKey === activeTab) return;
+
+    if (activeKey === 'activity') {
+      trackWalletEvent(WALLET_EVENTS.ACTIVITY_TAB_CLICKED, {
+        walletAddress: walletAddress ?? undefined,
+        sourceScreen: 'wallet_dashboard',
+        step: 'activity_tab',
+      });
+    } else if (activeKey === 'subAccounts') {
+      trackWalletEvent(WALLET_EVENTS.SUB_ACCOUNTS_TAB_CLICKED, {
+        walletAddress: walletAddress ?? undefined,
+        sourceScreen: 'wallet_dashboard',
+        step: 'sub_accounts_tab',
+      });
     }
+
+    setActiveTab(activeKey as WalletTabKey);
   };
 
   return (

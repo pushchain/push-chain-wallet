@@ -65,9 +65,9 @@ const TokensList: FC<TokensListProps> = ({
                     <OriginChainTokenList
                         originWalletAddress={parsedWallet}
                         showFaucet={shouldShowFaucetOnOrigin}
-                        handleSelectToken={(_token, walletDetails) =>
+                        handleSelectToken={(token, walletDetails) =>
                             startSendFlow({
-                                token: null,
+                                token,
                                 chainId: walletDetails.chainId,
                                 native: true,
                                 source: 'origin',

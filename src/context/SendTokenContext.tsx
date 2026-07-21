@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from "react";
 import { SendTokenState, TokenFormat, WalletType } from "../types";
 import { encodeFunctionData, erc20Abi, parseUnits } from "viem";
 import { usePushChain } from "../context/PushChainContext";
@@ -13,8 +13,15 @@ import { CHAIN } from "@pushchain/core/src/lib/constants/enums";
 import type { MoveableToken, PushChainMoveableToken } from "@pushchain/core/src/lib/constants";
 import { convertCaipToObject, getNativeTokenBalance, getWalletlist } from "../modules/wallet/Wallet.utils";
 import { useGlobalState } from "./GlobalContext";
-import { TOKEN_LISTS } from "../helpers/TokenHelper";
 import { PRC20_TOKENS } from "../constants";
+import {
+  buildSendEventMetadata,
+  getSafeWalletErrorMessage,
+  trackWalletEvent,
+  trackWalletSendSuccess,
+  WALLET_EVENTS,
+} from "../analytics/walletEvents";
+import type { WalletEventMetadata } from "../analytics/walletEvents";
 
 interface SendTokenContextType {
   walletAddress: string;
@@ -38,7 +45,7 @@ interface SendTokenContextType {
   setTokenDetails: React.Dispatch<React.SetStateAction<TokenDetails>>;
   nativeBalance: string;
   loadingNativeBalance: boolean;
-  nativeToken: TokenFormat | null;
+  trackingMetadata: WalletEventMetadata;
 }
 
 export type DestinationNetwork = 'push' | 'associated';
@@ -90,9 +97,6 @@ type PushMoveableToken = PushChainMoveableToken & {
   chain?: CHAIN;
   chainName?: string;
 };
-
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback;
 
 const getChainFromWalletDetails = (walletDetails?: WalletType | null) => {
   if (!walletDetails?.chainId) return undefined;
@@ -213,6 +217,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
   const [destinationNetwork, setDestinationNetwork] = useState<DestinationNetwork>('push');
 
   const [sendingTransaction, setSendingTransaction] = useState<boolean>(false);
+  const sendAttemptInFlight = useRef(false);
 
   const [txError, setTxError] = useState<string>('');
 
@@ -237,7 +242,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
   const selectedPrc20MoveableToken = useMemo(
     () => getPushMoveableTokenForDetails(tokenDetails),
-    [tokenDetails?.moveableToken, tokenDetails?.token?.address],
+    [tokenDetails],
   );
   const isSelectedPrc20Token = !!selectedPrc20MoveableToken;
   const associatedDestinationChain = useMemo(
@@ -275,11 +280,75 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
       ? associatedDestinationOption
       : PUSH_DESTINATION_OPTION;
 
+  const getSendTrackingMetadata = (extra: { txHash?: string; errorMessage?: string } = {}) => ({
+    ...buildSendEventMetadata({
+      walletAddress: executorAddress,
+      tokenDetails,
+      fallbackSourceChainId: result.chainId,
+      destinationChainId: selectedDestinationNetwork.chainId,
+      destinationNetwork: selectedDestinationNetwork.value,
+      recipientAddress: receiverAddress,
+      amount,
+      txHash: extra.txHash,
+    }),
+    errorMessage: extra.errorMessage,
+  });
+
+  const beginTransactionSubmission = () => {
+    if (sendAttemptInFlight.current) return false;
+
+    sendAttemptInFlight.current = true;
+    setSendingTransaction(true);
+    setTxError('');
+    return true;
+  };
+
+  const trackTransactionSubmission = () => {
+    trackWalletEvent(WALLET_EVENTS.SEND_TRANSACTION_SUBMITTED, {
+      ...getSendTrackingMetadata(),
+      step: 'transaction_submitted',
+    });
+  };
+
+  const handleSendFailure = (error: unknown, fallback = 'Transaction failed') => {
+    const errorMessage = getSafeWalletErrorMessage(error, fallback);
+    sendAttemptInFlight.current = false;
+    setTxError(errorMessage);
+    setSendingTransaction(false);
+    trackWalletEvent(WALLET_EVENTS.SEND_FAILED, {
+      ...getSendTrackingMetadata({ errorMessage }),
+      step: 'failed',
+    });
+  };
+
+  const submitTransaction = async (
+    sendTransaction: () => Promise<{ finalTxHash?: string | null }>,
+    iframePayload: unknown,
+  ) => {
+    if (!beginTransactionSubmission()) return;
+
+    if (isOpenedInIframe) {
+      sendMessageToMainTab({
+        type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
+        data: iframePayload,
+      });
+      trackTransactionSubmission();
+      return;
+    }
+
+    const transaction = sendTransaction();
+    trackTransactionSubmission();
+    const receipt = await transaction;
+
+    if (!receipt.finalTxHash) throw new Error('Transaction did not return a hash');
+    setSendState('confirmation');
+    setTxhash(receipt.finalTxHash);
+    setSendingTransaction(false);
+    sendAttemptInFlight.current = false;
+  };
+
   const sendToken = async (token: TokenFormat) => {
     try {
-
-      setSendingTransaction(true);
-      setTxError('')
       const value = parseUnits((amount || '0').toString(), token.decimals);
 
       const encodedData = encodeFunctionData({
@@ -294,27 +363,14 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         data: encodedData,
       }
 
-      if (isOpenedInIframe) {
-        sendMessageToMainTab({
-          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
-          data: { ...payload },
-        });
-
-        return;
-      }
-
-      const receipt = await pushChainClient.universal.sendTransaction(payload);
-
-      if (receipt.finalTxHash) {
-        setSendState("confirmation");
-        setTxhash(receipt.finalTxHash);
-      }
-      setSendingTransaction(false);
+      await submitTransaction(
+        () => pushChainClient.universal.sendTransaction(payload),
+        { ...payload },
+      );
 
     } catch (error) {
       console.error("Error in sending transaction", error);
-      setTxError(getErrorMessage(error, 'Transaction failed'))
-      setSendingTransaction(false);
+      handleSendFailure(error);
     }
   }
 
@@ -327,9 +383,6 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
       if (!associatedDestinationChain) {
         throw new Error('Missing associated chain.');
       }
-
-      setSendingTransaction(true);
-      setTxError('');
 
       const value = PushChain.utils.helpers.parseUnits(
         (amount || '0').toString(),
@@ -347,34 +400,19 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         },
       };
 
-      if (isOpenedInIframe) {
-        sendMessageToMainTab({
-          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
-          data: { ...payload, funds: { ...payload.funds, amount: value.toString() } },
-        });
-
-        return;
-      }
-
-      const receipt = await pushChainClient.universal.sendTransaction(payload);
-
-      if (receipt.finalTxHash) {
-        setSendState("confirmation");
-        setTxhash(receipt.finalTxHash);
-      }
-      setSendingTransaction(false);
+      await submitTransaction(
+        () => pushChainClient.universal.sendTransaction(payload),
+        { ...payload, funds: { ...payload.funds, amount: value.toString() } },
+      );
 
     } catch (error) {
       console.error("Error in sending PRC token to associated chain", error);
-      setTxError(getErrorMessage(error, 'Transaction failed'))
-      setSendingTransaction(false);
+      handleSendFailure(error);
     }
   }
 
   const sendPushNativeToken = async () => {
     try {
-      setSendingTransaction(true);
-      setTxError('')
       const value = PushChain.utils.helpers.parseUnits((amount || '0').toString(), 18);
 
       const payload: ExecuteParams = {
@@ -382,27 +420,14 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         value: value,
       }
 
-      if (isOpenedInIframe) {
-        sendMessageToMainTab({
-          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
-          data: { ...payload, value: value.toString() },
-        });
-
-        return;
-      }
-
-      const receipt = await pushChainClient.universal.sendTransaction(payload);
-
-      if (receipt.finalTxHash) {
-        setSendState("confirmation");
-        setTxhash(receipt.finalTxHash);
-      }
-      setSendingTransaction(false);
+      await submitTransaction(
+        () => pushChainClient.universal.sendTransaction(payload),
+        { ...payload, value: value.toString() },
+      );
 
     } catch (error) {
       console.error("Error in sending transaction", error);
-      setTxError(getErrorMessage(error, 'Transaction failed'))
-      setSendingTransaction(false);
+      handleSendFailure(error);
     }
   }
 
@@ -429,9 +454,6 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         throw new Error('Unsupported moveable token for selected source chain.');
       }
 
-      setSendingTransaction(true);
-      setTxError('');
-
       const value = PushChain.utils.helpers.parseUnits(
         (amount || '0').toString(),
         selectedToken.decimals,
@@ -446,34 +468,23 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
         },
       };
 
-      if (isOpenedInIframe) {
-        sendMessageToMainTab({
-          type: WALLET_TO_APP_ACTION.PUSH_SEND_TRANSACTION,
-          data: { ...payload, funds: { ...payload.funds, amount: value.toString() } },
-        });
-
-        return;
-      }
-
-      const receipt = await pushChainClient.universal.sendTransaction(payload);
-
-      if (receipt.finalTxHash) {
-        setSendState("confirmation");
-        setTxhash(receipt.finalTxHash);
-      }
-      setSendingTransaction(false);
+      await submitTransaction(
+        () => pushChainClient.universal.sendTransaction(payload),
+        { ...payload, funds: { ...payload.funds, amount: value.toString() } },
+      );
 
     } catch (error) {
       console.error("Error in sending moveable token transaction", error);
-      setTxError(getErrorMessage(error, 'Transaction failed'))
-      setSendingTransaction(false);
+      handleSendFailure(error);
     }
   }
 
   const handleSendTransaction = async () => {
     if (destinationNetwork === 'associated') {
       if (!canSelectDestinationNetwork) {
-        setTxError('Associated chain transfers are only available for PRC tokens.');
+        handleSendFailure(
+          new Error('Associated chain transfers are only available for PRC tokens.'),
+        );
         return;
       }
 
@@ -502,27 +513,11 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
 
   };
 
-  const tokens = useMemo(() => {
-      const chainNs = result.chain?.toLowerCase();
-      const chainId = Number(result.chainId);
-
-      if (chainNs === 'solana') return TOKEN_LISTS.SOLANA;
-
-      // EVM chains
-      if (chainNs === 'eip155' || chainNs === 'ethereum') {
-          switch (chainId) {
-              case 11155111: return TOKEN_LISTS.ETHEREUM;
-              case 84532:    return TOKEN_LISTS.BASE;
-              case 421614:   return TOKEN_LISTS.ARBITRUM;
-              case 97:       return TOKEN_LISTS.BINANCE;
-              default:       return TOKEN_LISTS.ETHEREUM;
-          }
-      }
-  }, [result.chain, result.chainId]);
+  const trackingMetadata = getSendTrackingMetadata({ txHash: txhash ?? undefined });
 
   useEffect(() => {
     const fetchNativeBalance = async () => {
-      const balanceToken = tokenDetails?.token ?? tokens?.[0];
+      const balanceToken = tokenDetails?.token;
       const balanceWallet = tokenDetails?.sourceWallet ?? result;
 
       if (!tokenDetails?.native) {
@@ -553,12 +548,35 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     tokenDetails?.native,
     tokenDetails?.sourceWallet,
     tokenDetails?.token,
-    tokens,
   ]);
 
   useEffect(() => {
-    if (txhash && sendState !== 'confirmation') setSendState("confirmation");
-  }, [sendState, txhash])
+    if (!txhash) return;
+
+    setSendingTransaction(false);
+    sendAttemptInFlight.current = false;
+    trackWalletSendSuccess({
+      walletAddress: executorAddress,
+      tokenDetails,
+      fallbackSourceChainId: result.chainId,
+      destinationChainId: selectedDestinationNetwork.chainId,
+      destinationNetwork: selectedDestinationNetwork.value,
+      recipientAddress: receiverAddress,
+      amount,
+      txHash: txhash,
+    });
+    if (sendState !== 'confirmation') setSendState("confirmation");
+  }, [
+    amount,
+    executorAddress,
+    receiverAddress,
+    result.chainId,
+    selectedDestinationNetwork.chainId,
+    selectedDestinationNetwork.value,
+    sendState,
+    tokenDetails,
+    txhash,
+  ])
 
   useEffect(() => {
     setDestinationNetwork('push');
@@ -596,7 +614,7 @@ export const SendTokenProvider: React.FC<{ children: ReactNode; initialTokenDeta
     tokenDetails,
     nativeBalance,
     loadingNativeBalance,
-    nativeToken: tokens?.[0] ?? null,
+    trackingMetadata,
   };
 
   return (

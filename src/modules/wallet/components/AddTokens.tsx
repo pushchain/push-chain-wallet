@@ -2,8 +2,6 @@ import {
     Box,
     Button,
     Dropdown,
-    Menu,
-    MenuItem,
     Spinner,
     Text,
     TextInput,
@@ -21,17 +19,15 @@ import { TokensListItem } from "./TokensListItem";
 import { truncateWords } from "common";
 import { isAddress } from "viem";
 import { CHAIN_MONOTONE_LOGO } from "common";
+import { trackWalletEvent, WALLET_EVENTS } from "../../../analytics/walletEvents";
 
-const NETWORKS = [
-    { id: 42101, name: "Push Testnet Donut", symbol: "PC" },
-];
+const SELECTED_NETWORK = { id: 42101, name: "Push Testnet Donut", symbol: "PC" };
 
 const AddTokens: FC = () => {
     const [tokenAddress, setTokenAddress] = useState<string | null>(null);
     const [token, setToken] = useState<TokenFormat | null>(null);
     const [loadingTokenDetails, setLoadingTokens] = useState<boolean>(false);
     const [error, setError] = useState("");
-    const [selectedNetwork, setSelectedNetwork] = useState(NETWORKS[0]);
 
     const { addToken, fetchTokenDetails } = useTokenManager();
     const { setActiveState } = useWalletDashboard();
@@ -80,11 +76,21 @@ const AddTokens: FC = () => {
             return;
         }
         if (res.success) {
+            trackWalletEvent(WALLET_EVENTS.TOKEN_ADDED, {
+                walletAddress: executorAddress,
+                tokenSymbol: token.symbol,
+                tokenAddress: token.address,
+                tokenType: 'erc20',
+                sourceChainId: SELECTED_NETWORK.id.toString(),
+                destinationChainId: SELECTED_NETWORK.id.toString(),
+                sourceScreen: 'manage_tokens',
+                step: 'token_added',
+            });
             setActiveState("walletDashboard");
         }
     };
 
-    const NetworkIcon = CHAIN_MONOTONE_LOGO[selectedNetwork.id];
+    const NetworkIcon = CHAIN_MONOTONE_LOGO[SELECTED_NETWORK.id];
 
     return (
         <Box
@@ -191,13 +197,13 @@ const AddTokens: FC = () => {
                                             variant="bs-semibold"
                                             color="pw-int-text-primary-color"
                                         >
-                                            {selectedNetwork.name}
+                                            {SELECTED_NETWORK.name}
                                         </Text>
                                         <Text
                                             variant="bs-regular"
                                             color="pw-int-text-secondary-color"
                                         >
-                                            {selectedNetwork.symbol}
+                                            {SELECTED_NETWORK.symbol}
                                         </Text>
                                     </Box>
                                 </Box>
@@ -231,7 +237,7 @@ const AddTokens: FC = () => {
                                 }}
                                 placeholder="Enter Token Address"
                                 label="Token Contract address"
-                                description={`Add the contract address of the token you want to add on ${selectedNetwork.name}`}
+                                description={`Add the contract address of the token you want to add on ${SELECTED_NETWORK.name}`}
                                 css={css`
                   color: white;
                 `}

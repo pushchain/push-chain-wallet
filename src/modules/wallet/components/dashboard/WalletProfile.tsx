@@ -13,6 +13,7 @@ import { useWalletOperations } from "../../../../hooks/useWalletOperations";
 import { FAUCET_URL } from "common";
 import { formatTokenValue } from "../../Wallet.utils";
 import { css } from "styled-components";
+import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
 
 export type WalletProfileProps = {
   walletAddress: string;
@@ -22,19 +23,14 @@ const buttonConfigs = [
   {
     icon: Download,
     label: "Receive",
-    onClick: (setActiveState: (state: string) => void, startSendFlow: () => void) =>
-      setActiveState("receive"),
   },
   {
     icon: SendNotification,
     label: "Send",
-    onClick: (_setActiveState: (state: string) => void, startSendFlow: () => void) =>
-      startSendFlow(),
   },
   {
     icon: IconLeading,
     label: "Faucet",
-    onClick: () => window.open(FAUCET_URL, "_blank"),
   },
 ];
 
@@ -48,6 +44,30 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
     data: balance,
     isLoading: isBalanceLoading,
   } = useWalletOperations(walletAddress);
+
+  const handleAction = (label: string) => {
+    if (label === 'Receive') {
+      trackWalletEvent(WALLET_EVENTS.RECEIVE_CLICKED, {
+        walletAddress,
+        sourceScreen: 'wallet_dashboard',
+        step: 'receive_entry',
+      });
+      setActiveState('receive');
+      return;
+    } else if (label === 'Faucet') {
+      trackWalletEvent(WALLET_EVENTS.FAUCET_CLICKED, {
+        walletAddress,
+        sourceScreen: 'wallet_dashboard',
+        step: 'faucet_entry',
+      });
+      window.open(FAUCET_URL, '_blank');
+      return;
+    }
+
+    // Send is tracked by startSendFlow so token-card entry points use the same
+    // event and cannot double-count this button.
+    startSendFlow();
+  };
 
   useEffect(() => {
     const el = ref.current;
@@ -124,7 +144,7 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
         </Box>
       </Box>
       <Box display="flex" flexDirection="row" justifyContent="space-between" gap='spacing-xxs'>
-        {buttonConfigs.map(({ icon: Icon, label, onClick }) => (
+        {buttonConfigs.map(({ icon: Icon, label }) => (
           <Box
             key={label}
             display="flex"
@@ -139,7 +159,7 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
             border="border-sm solid pw-int-border-primary-color"
             cursor="pointer"
             backgroundColor="pw-int-bg-primary-color"
-            onClick={() => onClick(setActiveState, startSendFlow)}
+            onClick={() => handleAction(label)}
           >
             <Icon color="pw-int-icon-brand-color" size={24} />
             <Text variant="bes-semibold">{label}</Text>

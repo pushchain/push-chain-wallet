@@ -28,12 +28,17 @@ import { bytesToHex, stringToBytes } from "viem";
 import { Reconnect } from "./components/Reconnect";
 import WalletRecoveryPhrase from "./components/WalletRecoveryPhrase";
 import { TokenDetails } from "../../context/SendTokenContext";
+import {
+  buildSendEventMetadata,
+  trackWalletEvent,
+  WALLET_EVENTS,
+} from "../../analytics/walletEvents";
 
 export type WalletProps = Record<string, never>;
 
 const Wallet: FC<WalletProps> = () => {
   const { state, dispatch } = useGlobalState();
-  const { pushChainClient } = usePushChain();
+  const { pushChainClient, executorAddress } = usePushChain();
   const [createAccountLoading, setCreateAccountLoading] = useState(true);
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -56,7 +61,23 @@ const Wallet: FC<WalletProps> = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<PushNetworks>('Push Testnet Donut');
   const [sendTokenSelection, setSendTokenSelection] = useState<TokenDetails | null>(null);
 
-  const startSendFlow = (tokenDetails: TokenDetails) => {
+  const startSendFlow = (tokenDetails?: TokenDetails) => {
+    const metadata = buildSendEventMetadata({
+      walletAddress: executorAddress,
+      tokenDetails,
+      sourceScreen: 'wallet_dashboard',
+    });
+
+    trackWalletEvent(WALLET_EVENTS.SEND_CLICKED, {
+      ...metadata,
+      step: 'send_entry',
+    });
+    if (tokenDetails) {
+      trackWalletEvent(WALLET_EVENTS.SEND_TOKEN_SELECTED, {
+        ...metadata,
+        step: 'token_selected',
+      });
+    }
     setSendTokenSelection(tokenDetails ?? null);
     setActiveState('send');
   };
@@ -265,7 +286,7 @@ const Wallet: FC<WalletProps> = () => {
       setSelectedWallet(
         getWalletlist(state.wallet)[0]
       );
-  }, [state?.wallet?.universalSigner]);
+  }, [state.wallet]);
 
   useEffect(() => {
     if (
