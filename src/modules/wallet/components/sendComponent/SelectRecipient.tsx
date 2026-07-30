@@ -6,7 +6,7 @@ import { DestinationNetworkOption, useSendTokenContext } from "../../../../conte
 import WalletHeader from "../dashboard/WalletHeader";
 import { useTokenBalance } from "../../../../hooks/useTokenBalance";
 import { usePushChain } from "../../../../context/PushChainContext";
-import { getChainIcon } from "../OriginChainTokenListItem";
+import { getChainIcon } from "common";
 import { useState } from "react";
 import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
 

@@ -1,15 +1,76 @@
-import { FC, useCallback, useEffect, useMemo, useRef } from "react";
-
-import { Box, Text, Spinner } from "../../../../blocks";
-import { useGetWalletActivities } from "../../../../hooks/useGetWalletActivities";
-import { WalletActivityListItem } from "./WalletActivityListItem";
-import { WalletActivitiesResponse } from "src/types/walletactivities.types";
-import { EXPLORER_URL } from "common";
-import { css } from "styled-components";
+import { FC, useCallback, useMemo, useRef } from 'react';
+import { Box, Spinner, Text } from '../../../../blocks';
+import { EXPLORER_URL } from 'common';
+import { css } from 'styled-components';
+import { useGetWalletActivities } from '../../../../hooks/useGetWalletActivities';
+import { useGetSwapActivities } from '../../../../hooks/useGetSwapActivities';
+import { useSwapTransaction } from '../../../../context/SwapTransactionContext';
+import { useWalletDashboard } from '../../../../context/WalletDashboardContext';
+import { WalletActivitiesResponse } from '../../../../types/walletactivities.types';
+import { WalletActivityListItem } from './WalletActivityListItem';
+import { SwapActivityListItem } from './SwapActivityListItem';
+import {
+  formatSwapActivityDateLabel,
+  getSwapActivityIdentityHashes,
+  getSwapActivityDateKey,
+  mergeSwapActivityRecords,
+  normalizeActivityTimestamp,
+  normalizeRamenSwapActivity,
+  SwapActivityRecord,
+} from '../swapComponent/swap.activity';
+import { normalizeExplorerSwapActivity } from '../swapComponent/swap.explorer-activity';
 
 export type WalletActivityListProps = {
   address: string | null;
   walletAliases?: string[];
+};
+
+type UnifiedActivity =
+  | {
+      kind: 'swap';
+      key: string;
+      timestamp: number;
+      activity: SwapActivityRecord;
+    }
+  | {
+      kind: 'transaction';
+      key: string;
+      timestamp: number;
+      transaction: WalletActivitiesResponse;
+    };
+
+type UnifiedActivityGroup = {
+  key: string;
+  label: string;
+  activities: UnifiedActivity[];
+};
+
+const normalizeWalletAddress = (value: string) =>
+  (value.match(/0x[0-9a-fA-F]{40}$/)?.[0] ?? value).toLowerCase();
+
+const groupActivitiesByDate = (
+  activities: UnifiedActivity[],
+): UnifiedActivityGroup[] => {
+  const groups = new Map<string, UnifiedActivityGroup>();
+
+  activities.forEach((activity) => {
+    const key = getSwapActivityDateKey(activity.timestamp);
+    if (!key) return;
+
+    const existing = groups.get(key);
+    if (existing) {
+      existing.activities.push(activity);
+      return;
+    }
+
+    groups.set(key, {
+      key,
+      label: formatSwapActivityDateLabel(activity.timestamp),
+      activities: [activity],
+    });
+  });
+
+  return Array.from(groups.values());
 };
 
 const WalletActivityList: FC<WalletActivityListProps> = ({
@@ -17,99 +78,200 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
   walletAliases = [],
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const observer = useRef<IntersectionObserver | null>(null);
   const activityAddress = address ?? '';
-
   const {
-    data,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-    refetch,
-    error,
-  } = useGetWalletActivities({ address: activityAddress });
+    swapExecutions,
+    activeSwapExecution,
+    dismissSwapDrawer,
+    isSwapDrawerOpen,
+    selectSwapActivity,
+  } = useSwapTransaction();
+  const { setActiveDashboardTab, setActiveState } = useWalletDashboard();
+
+  const walletActivities = useGetWalletActivities({
+    address: activityAddress,
+  });
+  const swapActivities = useGetSwapActivities({
+    address: activityAddress,
+  });
 
   const trackedAddresses = useMemo(
     () => [activityAddress, ...walletAliases].filter(Boolean),
     [activityAddress, walletAliases],
   );
 
-  const allTransactions = useMemo(() => {
-    return data?.pages.flatMap(page => page.items) || [];
-  }, [data]);
+  const rawTransactions = useMemo(
+    () => {
+      const transactions =
+        walletActivities.data?.pages.flatMap((page) => page.items) ?? [];
+      const seenHashes = new Set<string>();
 
-
-  const lastTransactionElementRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isLoading || isFetchingNextPage) return;
-
-      if (observer.current) observer.current.disconnect();
-
-      observer.current = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-            fetchNextPage();
-          }
-        },
-        {
-          threshold: 1.0,
-          rootMargin: '100px',
-        }
-      );
-
-      if (node) observer.current.observe(node);
+      return transactions.filter((transaction) => {
+        const hash = transaction.hash.toLowerCase();
+        if (seenHashes.has(hash)) return false;
+        seenHashes.add(hash);
+        return true;
+      });
     },
-    [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]
+    [walletActivities.data],
   );
 
+  const remoteSwaps = useMemo(
+    () =>
+      (swapActivities.data?.pages ?? [])
+        .flatMap((page) => page.activities)
+        .map(normalizeRamenSwapActivity)
+        .filter(
+          (activity): activity is SwapActivityRecord =>
+            activity?.status === 'success',
+        ),
+    [swapActivities.data],
+  );
+
+  const localCompletedSwaps = useMemo(
+    () =>
+      swapExecutions.filter(
+        (activity) =>
+          activity.status === 'success' &&
+          trackedAddresses.some(
+            (trackedAddress) =>
+              normalizeWalletAddress(trackedAddress) ===
+              normalizeWalletAddress(activity.executorAddress),
+          ),
+      ),
+    [swapExecutions, trackedAddresses],
+  );
+
+  const explorerSwaps = useMemo(
+    () =>
+      rawTransactions
+        .map((transaction) =>
+          normalizeExplorerSwapActivity(
+            transaction,
+            trackedAddresses,
+          ),
+        )
+        .filter(
+          (activity): activity is SwapActivityRecord => !!activity,
+        ),
+    [rawTransactions, trackedAddresses],
+  );
+
+  const decodedSwaps = useMemo(
+    () =>
+      mergeSwapActivityRecords(remoteSwaps, [
+        ...explorerSwaps,
+        ...localCompletedSwaps,
+      ]),
+    [explorerSwaps, localCompletedSwaps, remoteSwaps],
+  );
+
+  const unifiedActivities = useMemo(() => {
+    const swapHashes = new Set(
+      decodedSwaps.flatMap(getSwapActivityIdentityHashes),
+    );
+    const swaps: UnifiedActivity[] = decodedSwaps.map((activity) => ({
+      kind: 'swap',
+      key: `swap:${activity.hash.toLowerCase()}`,
+      timestamp: activity.timestamp,
+      activity,
+    }));
+    const transactions: UnifiedActivity[] = rawTransactions
+      .filter(
+        (transaction) =>
+          !swapHashes.has(transaction.hash.toLowerCase()),
+      )
+      .map((transaction) => ({
+        kind: 'transaction',
+        key: `transaction:${transaction.hash.toLowerCase()}`,
+        timestamp: normalizeActivityTimestamp(transaction.timestamp) ?? 0,
+        transaction,
+      }));
+
+    return [...swaps, ...transactions].sort(
+      (first, second) => second.timestamp - first.timestamp,
+    );
+  }, [decodedSwaps, rawTransactions]);
+
+  const groupedActivities = useMemo(
+    () => groupActivitiesByDate(unifiedActivities),
+    [unifiedActivities],
+  );
+
+  const fetchMore = useCallback(() => {
+    if (
+      walletActivities.hasNextPage &&
+      !walletActivities.isFetchingNextPage
+    ) {
+      void walletActivities.fetchNextPage();
+    }
+    if (
+      swapActivities.hasNextPage &&
+      !swapActivities.isFetchingNextPage
+    ) {
+      void swapActivities.fetchNextPage();
+    }
+  }, [swapActivities, walletActivities]);
 
   const handleScroll = useCallback(() => {
-    if (!containerRef.current || isLoading || isFetchingNextPage || !hasNextPage) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollTop + clientHeight >= scrollHeight - 28) fetchMore();
+  }, [fetchMore]);
 
-    if (scrollTop + clientHeight >= scrollHeight - 20) {
-      fetchNextPage();
-    }
-  }, [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]);
+  const retry = () => {
+    void walletActivities.refetch();
+    void swapActivities.refetch();
+  };
 
-  useEffect(() => {
-    if (activityAddress) {
-      refetch();
-    }
-  }, [activityAddress, refetch]);
+  const isInitiallyLoading =
+    unifiedActivities.length === 0 &&
+    (walletActivities.isLoading || swapActivities.isLoading);
+  const isFetchingNextPage =
+    walletActivities.isFetchingNextPage ||
+    swapActivities.isFetchingNextPage;
+  const hasError =
+    unifiedActivities.length === 0 &&
+    !!walletActivities.error &&
+    !!swapActivities.error;
+  const drawerBottomPadding =
+    isSwapDrawerOpen && activeSwapExecution
+      ? activeSwapExecution.status === 'pending'
+        ? '132px'
+        : activeSwapExecution.status === 'failed'
+          ? '196px'
+          : '168px'
+      : '0';
 
-  useEffect(() => {
-    return () => {
-      if (observer.current) observer.current.disconnect();
-    };
-  }, []);
-
-  if (error) {
+  if (hasError) {
     return (
       <Box
         display="flex"
         flexDirection="column"
         height="292px"
-        padding="spacing-none spacing-xs spacing-none spacing-none"
         justifyContent="center"
         alignItems="center"
       >
         <Text variant="bes-semibold" color="pw-int-text-danger-bold-color">
           Error loading transactions
         </Text>
-        <Box margin="spacing-xs">
-          <button onClick={() => refetch()}>
-            <Text variant="bes-regular" color="pw-int-text-primary-color">
-              Retry
-            </Text>
-          </button>
+        <Box
+          margin="spacing-xs"
+          cursor="pointer"
+          role="button"
+          tabIndex={0}
+          onClick={retry}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') retry();
+          }}
+        >
+          <Text variant="bes-regular">Retry</Text>
         </Box>
       </Box>
     );
   }
-
 
   return (
     <Box
@@ -122,35 +284,94 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
       customScrollbar
       css={css`
         padding-right: 6px;
+        padding-bottom: ${drawerBottomPadding};
         margin-right: -8px;
+        scroll-padding-bottom: ${drawerBottomPadding};
       `}
     >
-      {/* Render all transactions */}
-      {allTransactions.map((transaction: WalletActivitiesResponse, index: number) => {
-        const isLast = index === allTransactions.length - 1;
-
-        return (
-          <Box
-            key={`${transaction.hash}-${index}`}
-            ref={isLast ? lastTransactionElementRef : null}
-            onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, "_blank")}
-            cursor="pointer"
-            css={css`
-                &:hover {
-                  background-color: var(--pw-int-bg-primary-color);
-                }
-            `}
-          >
-            <WalletActivityListItem
-              transaction={transaction}
-              addresses={trackedAddresses}
-            />
+      {groupedActivities.map((group) => (
+        <Box key={group.key} display="flex" flexDirection="column">
+          <Box padding="spacing-xxs spacing-xxxs">
+            <Text variant="bes-regular" color="pw-int-text-tertiary-color">
+              {group.label}
+            </Text>
           </Box>
-        );
-      })}
 
-      {/* Loading indicator for initial load */}
-      {isLoading && allTransactions.length === 0 && (
+          {group.activities.map((item) => {
+            if (item.kind === 'swap') {
+              return (
+                <Box
+                  key={item.key}
+                  cursor="pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View swap details for ${item.activity.tokensIn[0]?.symbol ?? 'token'}`}
+                  onClick={() => {
+                    dismissSwapDrawer();
+                    selectSwapActivity(item.activity);
+                    setActiveDashboardTab('activity');
+                    setActiveState('swapDetails');
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      dismissSwapDrawer();
+                      selectSwapActivity(item.activity);
+                      setActiveDashboardTab('activity');
+                      setActiveState('swapDetails');
+                    }
+                  }}
+                  css={css`
+                    &:hover {
+                      filter: brightness(0.98);
+                    }
+                  `}
+                >
+                  <SwapActivityListItem activity={item.activity} />
+                </Box>
+              );
+            }
+
+            return (
+              <Box
+                key={item.key}
+                cursor="pointer"
+                role="link"
+                tabIndex={0}
+                onClick={() =>
+                  window.open(
+                    `${EXPLORER_URL}/tx/${item.transaction.hash}`,
+                    '_blank',
+                    'noopener,noreferrer',
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    window.open(
+                      `${EXPLORER_URL}/tx/${item.transaction.hash}`,
+                      '_blank',
+                      'noopener,noreferrer',
+                    );
+                  }
+                }}
+                css={css`
+                  &:hover {
+                    background-color: var(--pw-int-bg-primary-color);
+                  }
+                `}
+              >
+                <WalletActivityListItem
+                  transaction={item.transaction}
+                  addresses={trackedAddresses}
+                />
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+
+      {isInitiallyLoading && (
         <Box
           margin="spacing-xs"
           display="flex"
@@ -162,7 +383,6 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
         </Box>
       )}
 
-      {/* Loading indicator for fetching next page */}
       {isFetchingNextPage && (
         <Box
           margin="spacing-xs"
@@ -174,8 +394,7 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
         </Box>
       )}
 
-      {/* Empty state */}
-      {!isLoading && allTransactions.length === 0 && !error && (
+      {!isInitiallyLoading && unifiedActivities.length === 0 && (
         <Box
           margin="spacing-xxxl spacing-none spacing-none spacing-none"
           display="flex"
@@ -183,23 +402,7 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
           alignItems="center"
           height="100%"
         >
-          <Text variant="bes-semibold" color="pw-int-text-primary-color">
-            Your activity will appear here
-          </Text>
-        </Box>
-      )}
-
-      {/* End of results indicator */}
-      {!hasNextPage && allTransactions.length > 0 && !isLoading && (
-        <Box
-          margin="spacing-xs"
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-        >
-          <Text variant="bes-regular" color="pw-int-text-secondary-color">
-            No more transactions to load
-          </Text>
+          <Text variant="bes-semibold">Your activity will appear here</Text>
         </Box>
       )}
     </Box>

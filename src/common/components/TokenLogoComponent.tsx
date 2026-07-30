@@ -2,10 +2,26 @@ import React from 'react';
 import { TOKEN_LOGO } from '../Common.constants';
 import { Box, Text } from 'blocks';
 import { css } from 'styled-components';
-import { getChainIcon } from '../../modules/wallet/components/OriginChainTokenListItem';
+import { getChainIcon } from './ChainIcon';
 
-const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, chainId: string | null }) => {
-    const IconComponent = TOKEN_LOGO[tokenSymbol];
+const getBaseTokenSymbol = (symbol: string) =>
+    symbol.replace(/[._](?:arb|base|bnb|bsc|eth|sol)$/i, '');
+
+type TokenLogoComponentProps = {
+    tokenSymbol: string;
+    chainId: string | null;
+    size?: number;
+    badgeSize?: number;
+};
+
+const TokenLogoComponent = ({
+    tokenSymbol,
+    chainId,
+    size = 36,
+    badgeSize = 18,
+}: TokenLogoComponentProps) => {
+    const IconComponent =
+        TOKEN_LOGO[tokenSymbol] ?? TOKEN_LOGO[getBaseTokenSymbol(tokenSymbol)];
     return (
         <Box
             position="relative"
@@ -15,13 +31,13 @@ const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, cha
         >
             {IconComponent ? (
                 <Box
-                    width="36px"
-                    height="36px"
+                    width={`${size}px`}
+                    height={`${size}px`}
                     borderRadius="radius-xl"
                     overflow="hidden"
                     alignSelf="center"
                 >
-                    <IconComponent width={36} height={36} />;
+                    <IconComponent width={size} height={size} />
                 </Box>
             ) : (
                 <Box
@@ -31,8 +47,8 @@ const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, cha
                     padding="spacing-xxs"
                     borderRadius="radius-sm"
                     backgroundColor="pw-int-bg-tertiary-color"
-                    width="36px"
-                    height="36px"
+                    width={`${size}px`}
+                    height={`${size}px`}
                     justifyContent="center"
                 >
                     <Text variant='bl-regular' color='pw-int-text-secondary-color'>{tokenSymbol.charAt(0)}</Text>
@@ -41,8 +57,8 @@ const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, cha
             
             <Box
                 position="absolute"
-                width="18px"
-                height="18px"
+                width={`${badgeSize}px`}
+                height={`${badgeSize}px`}
                 backgroundColor="pw-int-bg-primary-color"
                 borderRadius="radius-lg"
                 display="flex"
@@ -54,7 +70,7 @@ const TokenLogoComponent = ({ tokenSymbol, chainId }: { tokenSymbol: string, cha
                         right: 0;
                     `}
             >
-                {getChainIcon(chainId, 16)}
+                {getChainIcon(chainId, Math.max(10, badgeSize - 2))}
             </Box>
         </Box>
     )

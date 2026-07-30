@@ -10,5 +10,6 @@ export const surfaceSemantics = {
   'transparent': { light: colorPrimitives['transparent'], dark: colorPrimitives['transparent'] },
   'danger-subtle': { light: colorBrands['danger-100'], dark: colorBrands['danger-900'] },
   'danger-bold': { light: colorBrands['danger-500'], dark: colorBrands['danger-200'] },
+  'info-subtle': { light: colorBrands['info-100'], dark: colorBrands['info-900'] },
 
 };

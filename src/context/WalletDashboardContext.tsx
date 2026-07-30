@@ -1,5 +1,10 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { ActiveStates, PushNetworks, WalletListType } from '../types';
+import {
+    ActiveStates,
+    PushNetworks,
+    WalletDashboardTab,
+    WalletListType,
+} from '../types';
 import { TokenDetails } from './SendTokenContext';
 
 interface WalletDashboardContextType {
@@ -12,6 +17,8 @@ interface WalletDashboardContextType {
     startSendFlow: (tokenDetails?: TokenDetails) => void;
     selectedNetwork: PushNetworks;
     setSelectedNetwork: (network: PushNetworks) => void;
+    activeDashboardTab: WalletDashboardTab;
+    setActiveDashboardTab: (tab: WalletDashboardTab) => void;
 }
 
 const WalletDashboardContext = createContext<WalletDashboardContextType | undefined>(undefined);
@@ -31,6 +38,8 @@ export const WalletDashboardProvider = ({
     startSendFlow,
     selectedNetwork,
     setSelectedNetwork,
+    activeDashboardTab,
+    setActiveDashboardTab,
 }: WalletProviderProps) => {
 
     return (
@@ -45,6 +54,8 @@ export const WalletDashboardProvider = ({
                 startSendFlow,
                 selectedNetwork,
                 setSelectedNetwork,
+                activeDashboardTab,
+                setActiveDashboardTab,
             }}
         >
             {children}
@@ -52,10 +63,11 @@ export const WalletDashboardProvider = ({
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWalletDashboard = () => {
     const context = useContext(WalletDashboardContext);
     if (context === undefined) {
         throw new Error('useWalletDashboard must be used within a WalletProvider');
     }
     return context;
-}; 
+};

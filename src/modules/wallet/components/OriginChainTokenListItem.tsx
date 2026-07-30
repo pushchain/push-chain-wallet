@@ -1,20 +1,8 @@
-import { Box, Faucet, PushChainLogo, Text } from 'blocks';
-import { CHAIN_LOGO, modifyAddress } from 'common';
+import { Box, Faucet, Text } from 'blocks';
+import { getChainIcon, modifyAddress } from 'common';
 import { css } from 'styled-components';
 import { useState, useEffect } from 'react';
 import { getNativeTokenBalance } from '../Wallet.utils';
-
-export function getChainIcon(chainId, size) {
-    if (chainId == null || chainId === 'devnet') {
-        return <PushChainLogo width={size} height={size} />
-    }
-    const IconComponent = CHAIN_LOGO?.[chainId];
-    if (IconComponent) {
-        return <IconComponent width={size} height={size} />;
-    } else {
-        return <PushChainLogo width={size} height={size} />;
-    }
-}
 
 const OriginChainTokenListItem = ({
     token,

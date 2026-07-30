@@ -5,6 +5,7 @@ import {
   IconLeading,
   SendNotification,
   Spinner,
+  SwapDashboard,
   Text,
 } from "../../../../blocks";
 import WalletHeader from "./WalletHeader";
@@ -27,6 +28,10 @@ const buttonConfigs = [
   {
     icon: SendNotification,
     label: "Send",
+  },
+  {
+    icon: SwapDashboard,
+    label: "Swap",
   },
   {
     icon: IconLeading,
@@ -61,6 +66,14 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
         step: 'faucet_entry',
       });
       window.open(FAUCET_URL, '_blank');
+      return;
+    } else if (label === 'Swap') {
+      trackWalletEvent(WALLET_EVENTS.SWAP_CLICKED, {
+        walletAddress,
+        sourceScreen: 'wallet_dashboard',
+        step: 'swap_entry',
+      });
+      setActiveState('swap');
       return;
     }
 

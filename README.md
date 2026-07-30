@@ -107,6 +107,23 @@ Push Keys offer a robust architecture for managing cryptographic keys in a secur
    npm run test
    ```
 
+### Swap API configuration
+
+Swap quotes and executable transaction routes come from RamenFi's hosted
+`/api/quote` and `/api/swap` endpoints, matching the integration in
+`push-chain-examples/apps/bridge`. Configure:
+
+```bash
+VITE_SWAP_API_URL=https://www.ramenfi.xyz
+VITE_RAMENFI_API_KEY=<wallet-specific-api-key>
+```
+
+`VITE_SWAP_API_KEY` is accepted as a backwards-compatible alias. Configure only
+one key name.
+
+Because Vite variables are shipped to the browser, production credentials
+should be kept in a wallet-owned server or edge proxy instead of the app bundle.
+
 ## Contributing
 
 We welcome contributions from the community! To contribute, please follow these steps:

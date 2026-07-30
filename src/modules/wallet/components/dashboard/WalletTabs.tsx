@@ -1,15 +1,18 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import { Box, Tabs } from "../../../../blocks";
 import { WalletActivityList } from "./WalletActivityList";
 
 import { TokensList } from "../TokensList";
 import { SubAccountsList } from "../SubAccountsList";
-import { ActiveStates, WalletListType } from "../../../../types";
+import {
+  ActiveStates,
+  WalletDashboardTab,
+  WalletListType,
+} from "../../../../types";
 import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
+import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 
-type WalletTabKey = 'tokens' | 'activity' | 'subAccounts' | 'rewards' | 'wallets';
-
-const WALLET_TAB_KEYS: WalletTabKey[] = ['tokens', 'activity', 'subAccounts', 'rewards', 'wallets'];
+const WALLET_TAB_KEYS: WalletDashboardTab[] = ['tokens', 'activity', 'subAccounts'];
 
 export type WalletTabsProps = {
   walletList: WalletListType[];
@@ -25,10 +28,15 @@ const WalletTabs: FC<WalletTabsProps> = ({
   walletAliases = [],
   setActiveState
 }) => {
-  const [activeTab, setActiveTab] = useState<WalletTabKey>('tokens');
+  const { activeDashboardTab, setActiveDashboardTab } = useWalletDashboard();
 
   const handleTabChange = (activeKey: string) => {
-    if (!WALLET_TAB_KEYS.includes(activeKey as WalletTabKey) || activeKey === activeTab) return;
+    if (
+      !WALLET_TAB_KEYS.includes(activeKey as WalletDashboardTab) ||
+      activeKey === activeDashboardTab
+    ) {
+      return;
+    }
 
     if (activeKey === 'activity') {
       trackWalletEvent(WALLET_EVENTS.ACTIVITY_TAB_CLICKED, {
@@ -44,7 +52,7 @@ const WalletTabs: FC<WalletTabsProps> = ({
       });
     }
 
-    setActiveTab(activeKey as WalletTabKey);
+    setActiveDashboardTab(activeKey as WalletDashboardTab);
   };
 
   return (
@@ -55,7 +63,7 @@ const WalletTabs: FC<WalletTabsProps> = ({
             label: "Tokens",
             key: "tokens",
             children: (
-              activeTab === 'tokens' ? (
+              activeDashboardTab === 'tokens' ? (
                 <TokensList setActiveState={setActiveState} />
               ) : null
             )
@@ -64,7 +72,7 @@ const WalletTabs: FC<WalletTabsProps> = ({
             label: "Activity",
             key: "activity",
             children: (
-              activeTab === 'activity' ? (
+              activeDashboardTab === 'activity' ? (
                 <WalletActivityList
                   address={walletAddress}
                   walletAliases={walletAliases}
@@ -76,11 +84,11 @@ const WalletTabs: FC<WalletTabsProps> = ({
             label: "Sub-Accounts",
             key: "subAccounts",
             children: (
-              activeTab === 'subAccounts' ? <SubAccountsList /> : null
+              activeDashboardTab === 'subAccounts' ? <SubAccountsList /> : null
             ),
           },
         ]}
-        activeKey={activeTab}
+        activeKey={activeDashboardTab}
         onChange={handleTabChange}
       />
     </Box>
