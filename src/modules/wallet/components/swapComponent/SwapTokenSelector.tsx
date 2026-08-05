@@ -34,6 +34,7 @@ type SwapTokenSelectorProps = {
   chains: SwapChain[];
   selectedToken: SwapToken | null;
   getTokens: (chain: SwapChain) => SwapToken[];
+  isTokenDisabled?: (token: SwapToken) => boolean;
   onSelect: (token: SwapToken) => void;
   onClose: () => void;
 };
@@ -175,6 +176,7 @@ const SwapTokenSelector: FC<SwapTokenSelectorProps> = ({
   chains,
   selectedToken,
   getTokens,
+  isTokenDisabled,
   onSelect,
   onClose,
 }) => {
@@ -440,11 +442,14 @@ const SwapTokenSelector: FC<SwapTokenSelectorProps> = ({
       >
         {tokens.map((token) => {
           const tokenKey = getSwapTokenKey(token);
+          const disabled = isTokenDisabled?.(token) ?? false;
           const active =
             !!selectedToken &&
             tokenKey === getSwapTokenKey(selectedToken);
           const highlighted =
-            hoveredTokenKey !== null
+            disabled
+              ? false
+              : hoveredTokenKey !== null
               ? hoveredTokenKey === tokenKey
               : active;
           const balanceState = tokenBalances.getTokenState(token);
@@ -465,18 +470,26 @@ const SwapTokenSelector: FC<SwapTokenSelectorProps> = ({
               padding="spacing-xxs"
               minHeight="56px"
               borderRadius="radius-xxs"
-              cursor="pointer"
+              cursor={disabled ? 'not-allowed' : 'pointer'}
+              role="button"
+              aria-disabled={disabled}
+              title={disabled ? 'Already selected as the source token' : undefined}
               backgroundColor={
                 highlighted
                   ? 'pw-int-bg-secondary-color'
                   : 'pw-int-bg-primary-color'
               }
-              onMouseEnter={() => setHoveredTokenKey(tokenKey)}
+              onMouseEnter={() => {
+                if (!disabled) setHoveredTokenKey(tokenKey);
+              }}
               onMouseLeave={() => setHoveredTokenKey(null)}
-              onClick={() => onSelect(token)}
+              onClick={() => {
+                if (!disabled) onSelect(token);
+              }}
               css={css`
                 width: 100%;
                 box-sizing: border-box;
+                opacity: ${disabled ? 0.45 : 1};
               `}
             >
               <TokenLogoComponent
@@ -502,7 +515,7 @@ const SwapTokenSelector: FC<SwapTokenSelectorProps> = ({
                   `}
                 >
                   <Text
-                    variant="bm-semibold"
+                    variant="bm-regular"
                     ellipsis
                     css={css`
                       flex: 1;

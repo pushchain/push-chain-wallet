@@ -1,10 +1,11 @@
 import { FC } from 'react';
-import { Back, Box, Swap as SwapIcon, Text } from 'blocks';
+import { Back, Box, SwapDashboard as SwapIcon, Text } from 'blocks';
 import { TokenLogoComponent } from 'common';
 import { css } from 'styled-components';
 import { SwapActivityRecord } from '../swapComponent/swap.activity';
 import { getSwapTokenDisplaySymbol } from '../swapComponent/swap.utils';
 import { formatTokenValue } from '../../Wallet.utils';
+import { SWAP_DISPLAY_DECIMALS } from '../swapComponent/swap.constants';
 
 type SwapActivityListItemProps = {
   activity: SwapActivityRecord;
@@ -19,8 +20,14 @@ const SwapActivityListItem: FC<SwapActivityListItemProps> = ({
 
   const inputSymbol = getSwapTokenDisplaySymbol(input.symbol);
   const outputSymbol = getSwapTokenDisplaySymbol(output.symbol);
-  const inputAmount = formatTokenValue(input.amount, 6);
-  const outputAmount = formatTokenValue(output.amount, 6);
+  const inputAmount = formatTokenValue(
+    input.amount,
+    SWAP_DISPLAY_DECIMALS,
+  );
+  const outputAmount = formatTokenValue(
+    output.amount,
+    SWAP_DISPLAY_DECIMALS,
+  );
 
   return (
     <Box

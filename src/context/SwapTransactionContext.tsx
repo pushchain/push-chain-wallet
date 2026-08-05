@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { SwapActivityRecord } from '../modules/wallet/components/swapComponent/swap.activity';
@@ -49,6 +50,7 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
     null,
   );
   const [isSwapDrawerOpen, setSwapDrawerOpen] = useState(false);
+  const dismissedPendingExecutionId = useRef<string | null>(null);
   const [selectedSwapActivity, selectSwapActivity] =
     useState<SwapActivityRecord | null>(null);
 
@@ -64,6 +66,7 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
       ),
     ]);
     setActiveExecutionId(record.executionId);
+    dismissedPendingExecutionId.current = null;
     setSwapDrawerOpen(true);
   }, []);
 
@@ -81,10 +84,6 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
     [],
   );
 
-  const dismissSwapDrawer = useCallback(() => {
-    setSwapDrawerOpen(false);
-  }, []);
-
   const activeSwapExecution = useMemo(
     () =>
       swapExecutions.find(
@@ -92,6 +91,26 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
       ) ?? null,
     [activeExecutionId, swapExecutions],
   );
+
+  const dismissSwapDrawer = useCallback(() => {
+    dismissedPendingExecutionId.current =
+      activeSwapExecution?.status === 'pending'
+        ? activeSwapExecution.executionId
+        : null;
+    setSwapDrawerOpen(false);
+  }, [activeSwapExecution]);
+
+  useEffect(() => {
+    if (
+      activeSwapExecution &&
+      activeSwapExecution.status !== 'pending' &&
+      dismissedPendingExecutionId.current ===
+        activeSwapExecution.executionId
+    ) {
+      dismissedPendingExecutionId.current = null;
+      setSwapDrawerOpen(true);
+    }
+  }, [activeSwapExecution]);
 
   const value = useMemo<SwapTransactionContextValue>(
     () => ({

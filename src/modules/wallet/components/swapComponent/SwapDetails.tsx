@@ -23,7 +23,7 @@ import {
   shortenTransactionHash,
   SwapActivityToken,
 } from './swap.activity';
-import { PUSH_CHAIN_ID } from './swap.constants';
+import { PUSH_CHAIN_ID, SWAP_DISPLAY_DECIMALS } from './swap.constants';
 import { normalizePositiveNetworkCost } from './swap.gas';
 import {
   getSwapChainDisplayName,
@@ -81,7 +81,7 @@ const TokenRouteRow: FC<{
 }> = ({ token, fallbackChain }) => {
   const chain = token.chain || fallbackChain || PUSH_CHAIN_ID;
   const symbol = getSwapTokenDisplaySymbol(token.symbol);
-  const amount = formatTokenValue(token.amount, 6);
+  const amount = formatTokenValue(token.amount, SWAP_DISPLAY_DECIMALS);
 
   return (
     <Box

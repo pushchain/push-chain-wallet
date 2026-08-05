@@ -11,7 +11,12 @@ import {
 import { getChainIcon, TokenLogoComponent } from 'common';
 import { css } from 'styled-components';
 import WalletHeader from '../dashboard/WalletHeader';
-import { PUSH_CHAIN_ID, SWAP_TITLE } from './swap.constants';
+import { formatTokenValue } from '../../Wallet.utils';
+import {
+  PUSH_CHAIN_ID,
+  SWAP_DISPLAY_DECIMALS,
+  SWAP_TITLE,
+} from './swap.constants';
 import { SwapToken } from './swap.types';
 import {
   getSwapChainDisplayName,
@@ -70,7 +75,10 @@ const ReviewTokenRow: FC<{
   token: SwapToken;
 }> = ({ amount, token }) => {
   const displaySymbol = getSwapTokenDisplaySymbol(token.symbol);
-  const value = `${amount || '0'} ${displaySymbol}`;
+  const value = `${formatTokenValue(
+    amount || '0',
+    SWAP_DISPLAY_DECIMALS,
+  )} ${displaySymbol}`;
 
   return (
     <Box

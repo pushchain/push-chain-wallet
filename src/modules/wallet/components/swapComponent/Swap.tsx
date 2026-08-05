@@ -1,11 +1,20 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FC,
+  InputHTMLAttributes,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { PublicKey } from '@solana/web3.js';
 import {
   Box,
   Button,
   CaretDown,
   Info,
-  Swap as SwapIcon,
+  SwapDashboard as SwapIcon,
   Text,
 } from 'blocks';
 import { GasIcon, RamenTextIcon, TokenLogoComponent } from 'common';
@@ -28,6 +37,7 @@ import {
 import {
   AUTO_SLIPPAGE_PERCENTAGE,
   PUSH_CHAIN_ID,
+  SWAP_DISPLAY_DECIMALS,
   SWAP_TITLE,
 } from './swap.constants';
 import { executeSwapSteps } from './swap.executor';
@@ -76,6 +86,64 @@ const AmountInput = styled.input`
     color: var(--pw-int-text-disabled-color);
   }
 `;
+
+const MAX_AMOUNT_FONT_SIZE = 30;
+const MIN_AMOUNT_FONT_SIZE = 12;
+
+const ResponsiveAmountInput: FC<
+  InputHTMLAttributes<HTMLInputElement>
+> = ({ value, ...props }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const fitValue = useCallback(() => {
+    const input = inputRef.current;
+    if (!input || input.clientWidth <= 0) return;
+
+    let fontSize = MAX_AMOUNT_FONT_SIZE;
+    input.style.fontSize = `${fontSize}px`;
+
+    while (
+      input.scrollWidth > input.clientWidth &&
+      fontSize > MIN_AMOUNT_FONT_SIZE
+    ) {
+      fontSize -= 1;
+      input.style.fontSize = `${fontSize}px`;
+    }
+
+    if (input.scrollWidth <= input.clientWidth) {
+      input.scrollLeft = 0;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    fitValue();
+  }, [fitValue, value]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(fitValue);
+    resizeObserver?.observe(input);
+    window.addEventListener('resize', fitValue);
+
+    let isActive = true;
+    void document.fonts?.ready.then(() => {
+      if (isActive) fitValue();
+    });
+
+    return () => {
+      isActive = false;
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', fitValue);
+    };
+  }, [fitValue]);
+
+  return <AmountInput ref={inputRef} value={value} {...props} />;
+};
 
 type SelectorSide = 'from' | 'to' | null;
 type SwapView = 'form' | 'review';
@@ -128,8 +196,23 @@ const Swap: FC = () => {
   const queryClient = useQueryClient();
   const walletAddress =
     executorAddress ?? pushChainClient?.universal.account ?? '';
-  const origin = pushChainClient?.universal.origin;
-  const originChain = (origin?.chain as string | undefined) ?? PUSH_CHAIN_ID;
+  const universalOrigin = pushChainClient?.universal.origin;
+  const universalOriginChain = universalOrigin?.chain as string | undefined;
+  const universalOriginAddress = universalOrigin?.address;
+  // Some SDK clients expose `origin` through a getter that can return a new
+  // object on each read. Keep its identity stable so outbound recipient
+  // derivation is not restarted (and cleared) on every query render.
+  const origin = useMemo(
+    () =>
+      universalOriginChain && universalOriginAddress
+        ? {
+            chain: universalOriginChain,
+            address: universalOriginAddress,
+          }
+        : undefined,
+    [universalOriginAddress, universalOriginChain],
+  );
+  const originChain = universalOriginChain ?? PUSH_CHAIN_ID;
   const supportedChains = useMemo(getSupportedSwapChains, []);
   const destinationChains = useMemo(
     () =>
@@ -302,6 +385,8 @@ const Swap: FC = () => {
     !isSameToken(fromToken, toToken) &&
     isValidSwapAmount(amount) &&
     (isDebouncing || quote.isFetching);
+  const recipientPending =
+    isOutbound && recipientResolution === 'resolving';
   const gasPrice = useQuery({
     queryKey: ['push-chain-gas-price', viemClient.chain.id],
     queryFn: () => viemClient.getGasPrice(),
@@ -332,10 +417,15 @@ const Swap: FC = () => {
     );
   const lowLiquidity =
     quote.data?.liquidity?.hasSufficientLiquidity === false;
+  const hasBlockingSwapError =
+    amountExceedsBalance ||
+    selectedBalance.isError ||
+    !!recipientError ||
+    !!quote.error;
   const outputAmount =
     quote.data?.amountOut && !isDebouncing
       ? Number(quote.data.amountOut).toLocaleString(undefined, {
-          maximumFractionDigits: 6,
+          maximumFractionDigits: SWAP_DISPLAY_DECIMALS,
         })
       : '';
   const exchangeRate =
@@ -362,7 +452,7 @@ const Swap: FC = () => {
         : selectedBalance.isError
           ? '—'
           : Number(selectedBalance.balance ?? 0).toLocaleString(undefined, {
-              maximumFractionDigits: 6,
+              maximumFractionDigits: SWAP_DISPLAY_DECIMALS,
             });
   const canSetMax =
     !!fromToken &&
@@ -395,11 +485,17 @@ const Swap: FC = () => {
     !isDebouncing &&
     !quote.isFetching &&
     !!quote.data &&
-    !lowLiquidity &&
     (!isOutbound || (!!recipient.trim() && !recipientError));
 
+  useEffect(() => {
+    if (isSameToken(fromToken, toToken)) setToToken(null);
+  }, [fromToken, toToken]);
+
   const selectToken = (token: SwapToken) => {
-    if (selector === 'from') setFromToken(token);
+    if (selector === 'from') {
+      setFromToken(token);
+      if (isSameToken(token, toToken)) setToToken(null);
+    }
     if (selector === 'to') setToToken(token);
     setAmount('');
     setDebouncedAmount('');
@@ -778,6 +874,11 @@ const Swap: FC = () => {
           getTokens={
             selector === 'from' ? getSourceTokens : getDestinationTokens
           }
+          isTokenDisabled={
+            selector === 'to'
+              ? (token) => isSameToken(token, fromToken)
+              : undefined
+          }
           onSelect={selectToken}
           onClose={() => setSelector(null)}
         />
@@ -837,7 +938,7 @@ const Swap: FC = () => {
           backgroundColor="pw-int-bg-secondary-color"
         >
           <Box display="flex" alignItems="center" gap="spacing-xs">
-            <AmountInput
+            <ResponsiveAmountInput
               inputMode="decimal"
               value={amount}
               placeholder="0"
@@ -893,7 +994,7 @@ const Swap: FC = () => {
           backgroundColor="pw-int-bg-primary-color"
         >
           <Box display="flex" alignItems="center" gap="spacing-xs" width="100%">
-            <AmountInput
+            <ResponsiveAmountInput
               readOnly
               value={quote.isFetching || isDebouncing ? '' : outputAmount}
               placeholder="0"
@@ -935,7 +1036,11 @@ const Swap: FC = () => {
             }
           }}
         >
-          <SwapIcon size={20} color="pw-int-icon-primary-color" />
+          <SwapIcon
+            size={20}
+            color="pw-int-icon-primary-color"
+            style={{ transform: 'rotate(90deg)' }}
+          />
         </Box>
       </Box>
 
@@ -980,17 +1085,31 @@ const Swap: FC = () => {
             borderRadius="radius-xs"
             backgroundColor="pw-int-bg-primary-color"
           >
-            <Info size={20} color="pw-int-icon-danger-bold-color" />
-            <Text variant="bes-regular" color="pw-int-text-danger-bold-color">
+            <Info
+              size={20}
+              color={
+                lowLiquidity && !hasBlockingSwapError
+                  ? 'pw-int-icon-secondary-color'
+                  : 'pw-int-icon-danger-bold-color'
+              }
+            />
+            <Text
+              variant="bes-regular"
+              color={
+                lowLiquidity && !hasBlockingSwapError
+                  ? 'pw-int-text-secondary-color'
+                  : 'pw-int-text-danger-bold-color'
+              }
+            >
               {amountExceedsBalance
                 ? 'Insufficient balance'
                 : selectedBalance.isError
                   ? 'Unable to load the selected account balance'
-                  : lowLiquidity
-                    ? 'This route does not have enough liquidity'
-                    : recipientError ||
-                      (quote.error instanceof Error
-                        ? quote.error.message
+                  : recipientError ||
+                    (quote.error instanceof Error
+                      ? quote.error.message
+                      : lowLiquidity
+                        ? 'Pool liquidity for this pair is low. You may get a worse price or higher slippage'
                         : 'Unable to fetch a quote')}
             </Text>
           </Box>
@@ -1007,7 +1126,7 @@ const Swap: FC = () => {
               <Box
                 title={`1 ${fromToken.symbol} = ${exchangeRate.toLocaleString(
                   undefined,
-                  { maximumFractionDigits: 6 },
+                  { maximumFractionDigits: SWAP_DISPLAY_DECIMALS },
                 )} ${toToken.symbol}`}
                 css={css`
                   flex: 1;
@@ -1021,7 +1140,7 @@ const Swap: FC = () => {
                 >
                   1 {fromToken.symbol} ={' '}
                   {exchangeRate.toLocaleString(undefined, {
-                    maximumFractionDigits: 6,
+                    maximumFractionDigits: SWAP_DISPLAY_DECIMALS,
                   })}{' '}
                   {toToken.symbol}
                 </Text>
@@ -1059,7 +1178,7 @@ const Swap: FC = () => {
         <Button
           block
           disabled={!canReview}
-          loading={quotePending}
+          loading={quotePending || recipientPending}
           onClick={() => {
             if (!canReview || !fromToken || !toToken) return;
             trackWalletEvent(WALLET_EVENTS.SWAP_REVIEW_CLICKED, {

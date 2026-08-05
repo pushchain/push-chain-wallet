@@ -15,6 +15,7 @@ import { useSwapTransaction } from '../../../../context/SwapTransactionContext';
 import { formatTokenValue } from '../../Wallet.utils';
 import { getSwapFailurePresentation } from './swap.failure';
 import { getSwapTokenDisplaySymbol } from './swap.utils';
+import { SWAP_DISPLAY_DECIMALS } from './swap.constants';
 
 const openExternalLink = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -98,7 +99,7 @@ const SwapTransactionDrawer: FC = () => {
       role={isFailed ? 'alert' : 'status'}
       aria-live={isFailed ? 'assertive' : 'polite'}
     >
-      <Box display="flex" alignItems="center" justifyContent="space-between">
+      <Box display="flex" alignItems="center">
         <Box display="flex" alignItems="center" gap="spacing-xxs">
           <Text variant="bm-regular" color="pw-int-text-secondary-color">
             {title}
@@ -106,7 +107,12 @@ const SwapTransactionDrawer: FC = () => {
           {isPending && <Spinner variant="primary" size="small" />}
         </Box>
         <Box
+          position="absolute"
+          top="spacing-xs"
+          right="spacing-xs"
           display="flex"
+          width="32px"
+          height="32px"
           alignItems="center"
           justifyContent="center"
           cursor="pointer"
@@ -134,7 +140,7 @@ const SwapTransactionDrawer: FC = () => {
             badgeSize={13}
           />
           <Text variant="bm-regular">
-            {formatTokenValue(input.amount, 6)}{' '}
+            {formatTokenValue(input.amount, SWAP_DISPLAY_DECIMALS)}{' '}
             {getSwapTokenDisplaySymbol(input.symbol)}
           </Text>
         </Box>
@@ -156,7 +162,7 @@ const SwapTransactionDrawer: FC = () => {
             badgeSize={13}
           />
           <Text variant="bm-regular">
-            {formatTokenValue(output.amount, 6)}{' '}
+            {formatTokenValue(output.amount, SWAP_DISPLAY_DECIMALS)}{' '}
             {getSwapTokenDisplaySymbol(output.symbol)}
           </Text>
         </Box>

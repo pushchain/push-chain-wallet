@@ -11,6 +11,7 @@ export const ZERO_ADDRESS =
 export const AUTO_SLIPPAGE_PERCENTAGE = '0.50';
 export const DEFAULT_SLIPPAGE_PERCENTAGE = '5.50';
 export const SWAP_TITLE = 'Swap';
+export const SWAP_DISPLAY_DECIMALS = 5;
 
 const SYMBOL_DECIMALS: Record<string, number> = {
   PUSD: 6,
