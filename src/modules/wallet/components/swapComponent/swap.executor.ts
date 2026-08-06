@@ -249,8 +249,8 @@ export const executeSwapSteps = async ({
   const hasExternalSource = !!sourceChain && !isPushChain(sourceChain);
   const isCeaSource =
     hasExternalSource &&
-    !!originChain &&
-    sourceChain !== originChain;
+    (!originChain ||
+      sourceChain.toLowerCase() !== originChain.toLowerCase());
   const canRelayMulticall =
     hasExternalSource || (!!originChain && !isPushChain(originChain));
   let lastHash: string | null = null;

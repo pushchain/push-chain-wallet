@@ -1,4 +1,4 @@
-import { parseUnits } from 'viem';
+import { isAddress, isHex, parseUnits } from 'viem';
 import { SwapStep, SwapToken } from './swap.types';
 import {
   getSwapChainDisplayName,
@@ -49,8 +49,14 @@ export type ValidateRamenSwapStepsParams = {
   originChain?: string | null;
   sourceChain: string;
   destinationChain: string;
-  fromToken: Pick<SwapToken, 'address' | 'symbol' | 'decimals'>;
-  toToken: Pick<SwapToken, 'address' | 'symbol'>;
+  fromToken: Pick<
+    SwapToken,
+    'address' | 'symbol' | 'decimals' | 'mechanism'
+  >;
+  toToken: Pick<
+    SwapToken,
+    'address' | 'symbol' | 'decimals' | 'mechanism'
+  >;
   /**
    * The destination account selected by the wallet. Required for an external
    * destination and intentionally omitted for a Push Chain destination.
@@ -116,6 +122,12 @@ const getMalformedStepReason = (step: unknown): string | null => {
       typeof step.data !== 'string'
     ) {
       return 'The swap target, value, or calldata is missing.';
+    }
+    if (!isAddress(step.to)) {
+      return 'The swap target is not a valid Push Chain address.';
+    }
+    if (!isHex(step.data) || step.data.length < 10) {
+      return 'The swap calldata is not valid encoded function data.';
     }
     return null;
   }
@@ -297,7 +309,11 @@ export const validateRamenSwapSteps = ({
         sourceChain,
         bridgeStep.token.address,
         fromToken.address,
-      )
+      ) ||
+      bridgeStep.token.symbol.trim().toLowerCase() !==
+        fromToken.symbol.trim().toLowerCase() ||
+      bridgeStep.token.decimals !== fromToken.decimals ||
+      bridgeStep.token.mechanism !== fromToken.mechanism
     ) {
       return fail(
         sourceAccountType,
@@ -306,6 +322,8 @@ export const validateRamenSwapSteps = ({
         {
           expectedToken: fromToken.address,
           receivedToken: bridgeStep.token.address,
+          expectedMechanism: fromToken.mechanism,
+          receivedMechanism: bridgeStep.token.mechanism,
         },
       );
     }
@@ -380,7 +398,9 @@ export const validateRamenSwapSteps = ({
         toToken.address,
       ) ||
       outboundStep.tokenSymbol.trim().toLowerCase() !==
-        toToken.symbol.trim().toLowerCase()
+        toToken.symbol.trim().toLowerCase() ||
+      outboundStep.token.decimals !== toToken.decimals ||
+      outboundStep.token.mechanism !== toToken.mechanism
     ) {
       return fail(
         sourceAccountType,
@@ -391,6 +411,8 @@ export const validateRamenSwapSteps = ({
           receivedToken: outboundStep.token.address,
           expectedSymbol: toToken.symbol,
           receivedSymbol: outboundStep.tokenSymbol,
+          expectedMechanism: toToken.mechanism,
+          receivedMechanism: outboundStep.token.mechanism,
         },
       );
     }

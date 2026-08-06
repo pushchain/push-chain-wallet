@@ -97,7 +97,7 @@ const swap = (value = '0'): SwapStep => ({
   type: 'swap',
   to: '0x6666666666666666666666666666666666666666',
   value,
-  data: '0x1234',
+  data: '0x12345678',
 });
 
 const outbound = (
@@ -314,6 +314,56 @@ describe('valid RamenFi account route matrix', () => {
         steps: [swap()],
       }),
     },
+    {
+      description: 'UOA to UEA as an identity bridge',
+      expectedSource: 'UOA',
+      params: validationParams({
+        sourceChain: ETHEREUM,
+        destinationChain: PUSH_CHAIN_ID,
+        fromToken: ethereumEth,
+        toToken: token({
+          chain: PUSH_CHAIN_ID,
+          address: ETHEREUM_USDC,
+          symbol: 'pETH',
+          decimals: 18,
+        }),
+        amountIn: '0.001',
+        steps: [bridge(ethereumEth, '1000000000000000')],
+      }),
+    },
+    {
+      description: 'CEA to UEA as an identity bridge',
+      expectedSource: 'CEA',
+      params: validationParams({
+        sourceChain: ARBITRUM,
+        destinationChain: PUSH_CHAIN_ID,
+        fromToken: arbitrumUsdc,
+        toToken: pushUsdc,
+        steps: [bridge(arbitrumUsdc)],
+      }),
+    },
+    {
+      description: 'UEA to UOA as an outbound-only identity route',
+      expectedSource: 'UEA',
+      params: validationParams({
+        sourceChain: PUSH_CHAIN_ID,
+        destinationChain: ETHEREUM,
+        fromToken: pushUsdc,
+        toToken: ethereumUsdc,
+        steps: [outbound(ethereumUsdc)],
+      }),
+    },
+    {
+      description: 'UEA to CEA as an outbound-only identity route',
+      expectedSource: 'UEA',
+      params: validationParams({
+        sourceChain: PUSH_CHAIN_ID,
+        destinationChain: ARBITRUM,
+        fromToken: pushUsdc,
+        toToken: arbitrumUsdc,
+        steps: [outbound(arbitrumUsdc)],
+      }),
+    },
   ])(
     'accepts $description',
     ({ params, expectedSource }) => {
@@ -372,6 +422,26 @@ describe('RamenFi route invariant failures', () => {
             type: 'bridge',
             amountRaw: '1000000',
           } as unknown as SwapStep,
+          swap(),
+        ],
+      }),
+    },
+    {
+      description: 'invalid swap calldata',
+      code: 'INVALID_STEP',
+      params: validationParams({
+        steps: [
+          bridge(ethereumUsdc),
+          { ...swap(), data: '0x12' },
+        ],
+      }),
+    },
+    {
+      description: 'a bridge with the wrong funding mechanism',
+      code: 'BRIDGE_TOKEN_MISMATCH',
+      params: validationParams({
+        steps: [
+          bridge({ ...ethereumUsdc, mechanism: 'native' }),
           swap(),
         ],
       }),
@@ -483,6 +553,19 @@ describe('RamenFi route invariant failures', () => {
           outbound(baseUsdc, {
             destinationChain: ARBITRUM,
           }),
+        ],
+      }),
+    },
+    {
+      description: 'an outbound with the wrong funding mechanism',
+      code: 'OUTBOUND_TOKEN_MISMATCH',
+      params: validationParams({
+        destinationChain: ARBITRUM,
+        toToken: arbitrumUsdc,
+        steps: [
+          bridge(ethereumUsdc),
+          swap(),
+          outbound({ ...arbitrumUsdc, mechanism: 'native' }),
         ],
       }),
     },

@@ -39,6 +39,7 @@ type SwapTransactionContextValue = {
 
 const SwapTransactionContext =
   createContext<SwapTransactionContextValue | null>(null);
+const PENDING_SWAP_REMINDER_DELAY_MS = 30_000;
 
 const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
   children,
@@ -51,6 +52,7 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
   );
   const [isSwapDrawerOpen, setSwapDrawerOpen] = useState(false);
   const dismissedPendingExecutionId = useRef<string | null>(null);
+  const pendingReminderTimeout = useRef<number | null>(null);
   const [selectedSwapActivity, selectSwapActivity] =
     useState<SwapActivityRecord | null>(null);
 
@@ -58,17 +60,30 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
     persistSuccessfulSwapExecutions(swapExecutions);
   }, [swapExecutions]);
 
-  const beginSwapExecution = useCallback((record: SwapExecutionRecord) => {
-    setSwapExecutions((current) => [
-      record,
-      ...current.filter(
-        (candidate) => candidate.executionId !== record.executionId,
-      ),
-    ]);
-    setActiveExecutionId(record.executionId);
-    dismissedPendingExecutionId.current = null;
-    setSwapDrawerOpen(true);
+  const clearPendingReminder = useCallback(() => {
+    if (pendingReminderTimeout.current !== null) {
+      window.clearTimeout(pendingReminderTimeout.current);
+      pendingReminderTimeout.current = null;
+    }
   }, []);
+
+  useEffect(() => clearPendingReminder, [clearPendingReminder]);
+
+  const beginSwapExecution = useCallback(
+    (record: SwapExecutionRecord) => {
+      clearPendingReminder();
+      setSwapExecutions((current) => [
+        record,
+        ...current.filter(
+          (candidate) => candidate.executionId !== record.executionId,
+        ),
+      ]);
+      setActiveExecutionId(record.executionId);
+      dismissedPendingExecutionId.current = null;
+      setSwapDrawerOpen(true);
+    },
+    [clearPendingReminder],
+  );
 
   const updateSwapExecution = useCallback(
     (executionId: string, update: SwapRecordUpdate) => {
@@ -93,12 +108,22 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
   );
 
   const dismissSwapDrawer = useCallback(() => {
-    dismissedPendingExecutionId.current =
-      activeSwapExecution?.status === 'pending'
-        ? activeSwapExecution.executionId
-        : null;
+    clearPendingReminder();
+    if (activeSwapExecution?.status === 'pending') {
+      const executionId = activeSwapExecution.executionId;
+      dismissedPendingExecutionId.current = executionId;
+      pendingReminderTimeout.current = window.setTimeout(() => {
+        if (dismissedPendingExecutionId.current === executionId) {
+          dismissedPendingExecutionId.current = null;
+          setSwapDrawerOpen(true);
+        }
+        pendingReminderTimeout.current = null;
+      }, PENDING_SWAP_REMINDER_DELAY_MS);
+    } else {
+      dismissedPendingExecutionId.current = null;
+    }
     setSwapDrawerOpen(false);
-  }, [activeSwapExecution]);
+  }, [activeSwapExecution, clearPendingReminder]);
 
   useEffect(() => {
     if (
@@ -107,10 +132,11 @@ const SwapTransactionProvider: FC<{ children: ReactNode }> = ({
       dismissedPendingExecutionId.current ===
         activeSwapExecution.executionId
     ) {
+      clearPendingReminder();
       dismissedPendingExecutionId.current = null;
       setSwapDrawerOpen(true);
     }
-  }, [activeSwapExecution]);
+  }, [activeSwapExecution, clearPendingReminder]);
 
   const value = useMemo<SwapTransactionContextValue>(
     () => ({

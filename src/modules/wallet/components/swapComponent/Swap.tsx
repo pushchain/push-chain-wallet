@@ -41,6 +41,7 @@ import {
   SWAP_TITLE,
 } from './swap.constants';
 import { executeSwapSteps } from './swap.executor';
+import { completeWalletSwapRoute } from './swap.route';
 import {
   getSwapFailureDetails,
   SwapFlowError,
@@ -485,6 +486,7 @@ const Swap: FC = () => {
     !isDebouncing &&
     !quote.isFetching &&
     !!quote.data &&
+    isValidSwapAmount(quote.data.amountOut) &&
     (!isOutbound || (!!recipient.trim() && !recipientError));
 
   useEffect(() => {
@@ -602,6 +604,12 @@ const Swap: FC = () => {
         poolResult: quote.data.poolResult,
         maxSlippage: slippage,
       });
+      const executionSteps = completeWalletSwapRoute({
+        sourceChain: fromToken.chain,
+        fromToken,
+        amountIn: amount,
+        steps: prepared.steps,
+      });
       const routeValidation = validateRamenSwapSteps({
         originChain,
         sourceChain: fromToken.chain,
@@ -612,7 +620,7 @@ const Swap: FC = () => {
           ? recipient.trim()
           : undefined,
         amountIn: amount,
-        steps: prepared.steps,
+        steps: executionSteps,
       });
       if (routeValidation.success === false) {
         throw new SwapFlowError({
@@ -628,7 +636,7 @@ const Swap: FC = () => {
         userAddress: executorAddress as `0x${string}`,
         originChain,
         sourceChain: fromToken.chain,
-        steps: prepared.steps,
+        steps: executionSteps,
         onTransactionSubmitted: (hash) => {
           transactionWasSubmitted = true;
           updateSwapExecution(executionId, (current) => {

@@ -116,6 +116,81 @@ describe('swap step execution', () => {
     );
   });
 
+  it('preserves approval/swap/unwrap ordering in relay multicall data', async () => {
+    const { client, sendTransaction } = createClient();
+    const calls: SwapStep[] = [
+      {
+        type: 'swap',
+        to: '0x1111111111111111111111111111111111111111',
+        value: '0',
+        data: '0xaaaaaaaa',
+      },
+      {
+        type: 'swap',
+        to: '0x2222222222222222222222222222222222222222',
+        value: '7',
+        data: '0xbbbbbbbb',
+      },
+      {
+        type: 'swap',
+        to: '0x3333333333333333333333333333333333333333',
+        value: '0',
+        data: '0xcccccccc',
+      },
+    ];
+
+    await executeSwapSteps({
+      pushChainClient: client,
+      userAddress: '0x4444444444444444444444444444444444444444',
+      originChain: CHAIN.ETHEREUM_SEPOLIA,
+      sourceChain: CHAIN.ARBITRUM_SEPOLIA,
+      steps: [pushSteps[0], ...calls],
+    });
+
+    expect(sendTransaction.mock.calls[0][0].data).toEqual([
+      {
+        to: '0x1111111111111111111111111111111111111111',
+        value: 0n,
+        data: '0xaaaaaaaa',
+      },
+      {
+        to: '0x2222222222222222222222222222222222222222',
+        value: 7n,
+        data: '0xbbbbbbbb',
+      },
+      {
+        to: '0x3333333333333333333333333333333333333333',
+        value: 0n,
+        data: '0xcccccccc',
+      },
+    ]);
+  });
+
+  it('executes an external-to-Push identity route as bridge-only', async () => {
+    const { client, sendTransaction } = createClient();
+    const userAddress = '0x2222222222222222222222222222222222222222';
+
+    const result = await executeSwapSteps({
+      pushChainClient: client,
+      userAddress,
+      originChain: CHAIN.ETHEREUM_SEPOLIA,
+      sourceChain: CHAIN.ETHEREUM_SEPOLIA,
+      steps: [pushSteps[0]],
+    });
+
+    expect(sendTransaction).toHaveBeenCalledWith(
+      {
+        to: userAddress,
+        funds: {
+          amount: 1000000000000000n,
+          token: sourceToken,
+        },
+      },
+      expect.any(Object),
+    );
+    expect(result.success).toBe(true);
+  });
+
   it('uses the connected UOA when the selected source is the origin chain', async () => {
     const { client, sendTransaction } = createClient();
 
@@ -129,6 +204,24 @@ describe('swap step execution', () => {
 
     expect(sendTransaction).toHaveBeenCalledTimes(1);
     expect(sendTransaction.mock.calls[0][0]).not.toHaveProperty('from');
+  });
+
+  it('uses explicit CEA routing when origin metadata is unavailable', async () => {
+    const { client, sendTransaction } = createClient();
+
+    await executeSwapSteps({
+      pushChainClient: client,
+      userAddress: '0x2222222222222222222222222222222222222222',
+      sourceChain: 'eip155:421614',
+      steps: pushSteps,
+    });
+
+    expect(sendTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: { chain: 'eip155:421614' },
+      }),
+      expect.any(Object),
+    );
   });
 
   it('reports an external source hash before the returned Push hash', async () => {
@@ -309,6 +402,63 @@ describe('swap step execution', () => {
       finalTxExplorerUrl:
         'https://explorer.test/tx/0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
     });
+  });
+
+  it('prepares a bridge-only external-to-external cascade for Solana output', async () => {
+    const { client, executeTransactions, prepareTransaction } = createClient();
+    const preparedInbound = { route: 'UOA_TO_PUSH' };
+    const preparedOutbound = { route: 'UOA_TO_SOLANA_CEA' };
+    prepareTransaction
+      .mockResolvedValueOnce(preparedInbound)
+      .mockResolvedValueOnce(preparedOutbound);
+    executeTransactions.mockResolvedValue({
+      initialTxHash:
+        '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      waitForAll: vi.fn().mockResolvedValue({
+        success: true,
+        finalTxHash:
+          '5HueCGU8rMjxEXxiPuD5BDuRaKQhL2n4QW7P4L9Dbh9Vj3qA1nYvR8oZ6tT2cS7wE4mK9pQ2xD5fG8hJ1kL3mN5',
+      }),
+    });
+    const recipient = '11111111111111111111111111111111';
+
+    const result = await executeSwapSteps({
+      pushChainClient: client,
+      userAddress: '0x2222222222222222222222222222222222222222',
+      originChain: CHAIN.ETHEREUM_SEPOLIA,
+      sourceChain: CHAIN.ETHEREUM_SEPOLIA,
+      steps: [
+        pushSteps[0],
+        {
+          type: 'outbound',
+          destinationChain: CHAIN.SOLANA_DEVNET,
+          recipientAddress: recipient,
+          amountRaw: '900000',
+          tokenSymbol: 'USDC',
+          token: {
+            chain: CHAIN.SOLANA_DEVNET,
+            chainName: 'SOLANA_DEVNET',
+            symbol: 'USDC',
+            address: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+            decimals: 6,
+            mechanism: 'approve',
+          },
+        },
+      ],
+    });
+
+    expect(prepareTransaction).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        to: { address: recipient, chain: CHAIN.SOLANA_DEVNET },
+        funds: expect.objectContaining({ amount: 900000n }),
+      }),
+    );
+    expect(executeTransactions).toHaveBeenCalledWith(
+      [preparedInbound, preparedOutbound],
+      expect.any(Object),
+    );
+    expect(result.success).toBe(true);
   });
 
   it('does not prepare a cascade for a native Push signer', async () => {

@@ -99,7 +99,13 @@ const SwapTransactionDrawer: FC = () => {
       role={isFailed ? 'alert' : 'status'}
       aria-live={isFailed ? 'assertive' : 'polite'}
     >
-      <Box display="flex" alignItems="center">
+      <Box
+        display="flex"
+        alignItems="center"
+        css={css`
+          padding-right: 32px;
+        `}
+      >
         <Box display="flex" alignItems="center" gap="spacing-xxs">
           <Text variant="bm-regular" color="pw-int-text-secondary-color">
             {title}
@@ -107,9 +113,6 @@ const SwapTransactionDrawer: FC = () => {
           {isPending && <Spinner variant="primary" size="small" />}
         </Box>
         <Box
-          position="absolute"
-          top="spacing-xs"
-          right="spacing-xs"
           display="flex"
           width="32px"
           height="32px"
@@ -119,6 +122,11 @@ const SwapTransactionDrawer: FC = () => {
           role="button"
           tabIndex={0}
           aria-label="Dismiss swap status"
+          css={css`
+            position: absolute;
+            top: var(--spacing-xs);
+            right: var(--spacing-xs);
+          `}
           onClick={dismissSwapDrawer}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
