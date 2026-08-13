@@ -11,7 +11,7 @@ import {
 import WalletHeader from "./WalletHeader";
 import { useWalletDashboard } from "../../../../context/WalletDashboardContext";
 import { useWalletOperations } from "../../../../hooks/useWalletOperations";
-import { FAUCET_URL } from "common";
+import { FAUCET_URL, getAppParamValue, isUIKitVersion } from "common";
 import { formatTokenValue } from "../../Wallet.utils";
 import { css } from "styled-components";
 import { trackWalletEvent, WALLET_EVENTS } from "../../../../analytics/walletEvents";
@@ -42,6 +42,8 @@ const buttonConfigs = [
 const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
   const { setActiveState, startSendFlow } = useWalletDashboard();
   const [ fontSize, setFontSize ] = useState(34);
+  const isOpenedInIframe = !!getAppParamValue();
+  const showSwap = isUIKitVersion('8') || !isOpenedInIframe;
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -157,27 +159,29 @@ const WalletProfile: FC<WalletProfileProps> = ({ walletAddress }) => {
         </Box>
       </Box>
       <Box display="flex" flexDirection="row" justifyContent="space-between" gap='spacing-xxs'>
-        {buttonConfigs.map(({ icon: Icon, label }) => (
-          <Box
-            key={label}
-            display="flex"
-            width='100%'
-            flexDirection="column"
-            padding="spacing-xs"
-            justifyContent="center"
-            alignItems="center"
-            gap="spacing-xxs"
-            alignSelf="stretch"
-            borderRadius="radius-xs"
-            border="border-sm solid pw-int-border-primary-color"
-            cursor="pointer"
-            backgroundColor="pw-int-bg-primary-color"
-            onClick={() => handleAction(label)}
-          >
-            <Icon color="pw-int-icon-brand-color" size={24} />
-            <Text variant="bes-semibold">{label}</Text>
-          </Box>
-        ))}
+        {buttonConfigs
+          .filter(({ label }) => label !== 'Swap' || showSwap)
+          .map(({ icon: Icon, label }) => (
+            <Box
+              key={label}
+              display="flex"
+              width='100%'
+              flexDirection="column"
+              padding="spacing-xs"
+              justifyContent="center"
+              alignItems="center"
+              gap="spacing-xxs"
+              alignSelf="stretch"
+              borderRadius="radius-xs"
+              border="border-sm solid pw-int-border-primary-color"
+              cursor="pointer"
+              backgroundColor="pw-int-bg-primary-color"
+              onClick={() => handleAction(label)}
+            >
+              <Icon color="pw-int-icon-brand-color" size={24} />
+              <Text variant="bes-semibold">{label}</Text>
+            </Box>
+          ))}
       </Box>
     </Box>
   );

@@ -9,7 +9,7 @@ export const useWalletOperations = (address: string) => {
         queryFn: () => fetchUserBalance(address),
         enabled: !!address,
         refetchInterval: pollMs,
-        refetchIntervalInBackground: true,
+        refetchIntervalInBackground: false,
         staleTime: pollMs - 1000,
     });
 };

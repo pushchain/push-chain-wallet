@@ -5,10 +5,12 @@ import {
   getMaxSwapAmount,
   getSourceTokens,
   getSwapChainDisplayName,
+  getSwapRecipientError,
   getSwapTokenDisplaySymbol,
   isSameToken,
   isValidSwapAmount,
   normalizeAmountInput,
+  shortenSwapAddress,
 } from './swap.utils';
 
 describe('swap utilities', () => {
@@ -25,6 +27,36 @@ describe('swap utilities', () => {
     expect(normalizeAmountInput('1.123456', 6)).toBe('1.123456');
     expect(normalizeAmountInput('1.1234567', 6)).toBeNull();
     expect(normalizeAmountInput('hello', 6)).toBeNull();
+  });
+
+  it('shortens receiver addresses for display', () => {
+    expect(
+      shortenSwapAddress('0x1919335B474AFF7654476eD155cAf13e220e459E'),
+    ).toBe('0x191...e459E');
+    expect(shortenSwapAddress('abc123')).toBe('abc123');
+  });
+
+  it('validates recipient addresses against the destination chain family', () => {
+    const evmAddress = '0x1111111111111111111111111111111111111111';
+    const solanaAddress = '11111111111111111111111111111111';
+
+    expect(getSwapRecipientError(evmAddress, 'eip155:84532')).toBe('');
+    expect(getSwapRecipientError(evmAddress, 'eip155:42101')).toBe('');
+    expect(getSwapRecipientError(solanaAddress, 'eip155:84532')).toContain(
+      'EVM',
+    );
+    expect(
+      getSwapRecipientError(
+        solanaAddress,
+        'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+      ),
+    ).toBe('');
+    expect(
+      getSwapRecipientError(
+        evmAddress,
+        'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+      ),
+    ).toContain('Solana');
   });
 
   it('compares both token chain and address', () => {

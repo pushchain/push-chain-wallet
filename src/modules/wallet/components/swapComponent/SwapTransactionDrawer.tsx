@@ -70,10 +70,14 @@ const SwapTransactionDrawer: FC = () => {
     : isCompleted
       ? 'Swap Completed'
       : 'Swap Failed';
-  const actionUrl = isCompleted
-    ? activeSwapExecution.explorerUrl
-    : undefined;
-  const actionLabel = 'View in Push Chain Explorer';
+  const actionUrl = isPending
+    ? activeSwapExecution.trackUrl
+    : isCompleted
+      ? activeSwapExecution.explorerUrl
+      : undefined;
+  const actionLabel = isPending
+    ? 'Track Transaction'
+    : 'View in Push Chain Explorer';
 
   return (
     <Box

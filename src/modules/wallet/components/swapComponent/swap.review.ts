@@ -1,5 +1,5 @@
 const swapRateFormatter = new Intl.NumberFormat(undefined, {
-  maximumSignificantDigits: 12,
+  maximumFractionDigits: 5,
   useGrouping: false,
 });
 

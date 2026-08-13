@@ -28,6 +28,7 @@ import { normalizePositiveNetworkCost } from './swap.gas';
 import {
   getSwapChainDisplayName,
   getSwapTokenDisplaySymbol,
+  shortenSwapAddress,
 } from './swap.utils';
 
 const formatSwapDetailsDate = (timestamp: number) => {
@@ -255,10 +256,31 @@ const SwapDetails: FC = () => {
                   {formatTokenValue(networkCost, 9)} PC
                 </Text>
                 <CaretUp
-                  size={18}
+                  size={20}
                   color="pw-int-icon-tertiary-color"
                 />
               </Box>
+            </Box>
+          )}
+
+          {selectedSwapActivity.destinationAddress && (
+            <Box display="flex" justifyContent="space-between" gap="spacing-xs">
+              <Text variant="bs-regular" color="pw-int-text-secondary-color">
+                Receiver
+              </Text>
+              <Text
+                variant="bs-regular"
+                textAlign="right"
+                ellipsis
+                title={selectedSwapActivity.destinationAddress}
+                css={css`
+                  max-width: 68%;
+                `}
+              >
+                {shortenSwapAddress(
+                  selectedSwapActivity.destinationAddress,
+                )}
+              </Text>
             </Box>
           )}
 

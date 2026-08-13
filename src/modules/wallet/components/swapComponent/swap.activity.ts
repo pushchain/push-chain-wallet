@@ -2,6 +2,7 @@ import type {
   SwapFailureDetails,
   SwapTransactionRef,
 } from './swap.types';
+import { PUSH_CHAIN_ID } from './swap.constants';
 import { normalizePositiveNetworkCost } from './swap.gas';
 
 export const PUSH_CHAIN_EXPLORER_URL = 'https://donut.push.network';
@@ -222,7 +223,12 @@ export const buildSwapTrackingUrl = (
 
   if (!chain || !hash || !baseUrl) return null;
 
-  return `${baseUrl}/track?utx=${chain}:${hash}`;
+  const universalTransaction =
+    chain.toLowerCase() === PUSH_CHAIN_ID.toLowerCase()
+      ? hash
+      : `${chain}:${hash}`;
+
+  return `${baseUrl}/track?utx=${universalTransaction}`;
 };
 
 export const buildPushTransactionExplorerUrl = (
@@ -395,6 +401,7 @@ const mergeToken = (
 const mergeTokenLists = (
   primaryTokens: readonly SwapActivityToken[],
   fallbackTokens: readonly SwapActivityToken[],
+  preferFallbackPresentation = false,
 ) => {
   if (!primaryTokens.length) return fallbackTokens.map((token) => ({ ...token }));
   if (!fallbackTokens.length) return primaryTokens.map((token) => ({ ...token }));
@@ -418,7 +425,21 @@ const mergeTokenLists = (
     if (fallbackIndex === -1) return { ...primaryToken };
 
     usedFallbackIndexes.add(fallbackIndex);
-    return mergeToken(primaryToken, fallbackTokens[fallbackIndex]);
+    const fallbackToken = fallbackTokens[fallbackIndex];
+    const mergedToken = mergeToken(primaryToken, fallbackToken);
+
+    if (!preferFallbackPresentation) return mergedToken;
+
+    return {
+      ...mergedToken,
+      address: firstString(fallbackToken.address, mergedToken.address) ?? '',
+      symbol: firstString(fallbackToken.symbol, mergedToken.symbol) ?? '',
+      chain: firstString(fallbackToken.chain, mergedToken.chain),
+      chainName: firstString(fallbackToken.chainName, mergedToken.chainName),
+      name: firstString(fallbackToken.name, mergedToken.name),
+      decimals: fallbackToken.decimals ?? mergedToken.decimals,
+      tokenId: firstString(fallbackToken.tokenId, mergedToken.tokenId),
+    };
   });
 
   fallbackTokens.forEach((token, index) => {
@@ -456,6 +477,7 @@ const mergeRecordWithFallback = (
   primary: SwapActivityRecord,
   fallback: SwapActivityRecord,
 ): SwapActivityRecord => {
+  const preserveSelectedRoute = fallback.recordSource === 'local';
   const transactionRefs = mergeTransactionRefs(
     primary.transactionRefs,
     fallback.transactionRefs,
@@ -468,13 +490,22 @@ const mergeRecordWithFallback = (
     timestamp: Number.isFinite(primary.timestamp)
       ? primary.timestamp
       : fallback.timestamp,
-    tokensIn: mergeTokenLists(primary.tokensIn, fallback.tokensIn),
-    tokensOut: mergeTokenLists(primary.tokensOut, fallback.tokensOut),
-    sourceChain: firstString(primary.sourceChain, fallback.sourceChain),
-    destinationChain: firstString(
-      primary.destinationChain,
-      fallback.destinationChain,
+    tokensIn: mergeTokenLists(
+      primary.tokensIn,
+      fallback.tokensIn,
+      preserveSelectedRoute,
     ),
+    tokensOut: mergeTokenLists(
+      primary.tokensOut,
+      fallback.tokensOut,
+      preserveSelectedRoute,
+    ),
+    sourceChain: preserveSelectedRoute
+      ? firstString(fallback.sourceChain, primary.sourceChain)
+      : firstString(primary.sourceChain, fallback.sourceChain),
+    destinationChain: preserveSelectedRoute
+      ? firstString(fallback.destinationChain, primary.destinationChain)
+      : firstString(primary.destinationChain, fallback.destinationChain),
     sourceAddress: firstString(primary.sourceAddress, fallback.sourceAddress),
     destinationAddress: firstString(
       primary.destinationAddress,

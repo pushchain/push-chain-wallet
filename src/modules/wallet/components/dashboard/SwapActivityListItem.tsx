@@ -36,7 +36,7 @@ const SwapActivityListItem: FC<SwapActivityListItemProps> = ({
       justifyContent="space-between"
       gap="spacing-xs"
       padding="spacing-xs spacing-xxxs"
-      backgroundColor="pw-int-bg-tertiary-color"
+      backgroundColor="pw-int-bg-transparent"
     >
       <Box
         display="flex"

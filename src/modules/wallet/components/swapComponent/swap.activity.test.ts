@@ -13,6 +13,7 @@ import {
   normalizeRamenSwapActivity,
   shortenTransactionHash,
 } from './swap.activity';
+import { PUSH_CHAIN_ID } from './swap.constants';
 
 const HASH_A =
   '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -291,6 +292,76 @@ describe('swap activity merging', () => {
     });
   });
 
+  it('keeps the user-selected route while using settled remote amounts', () => {
+    const local = swapRecord({
+      recordSource: 'local',
+      sourceChain: 'eip155:11155111',
+      destinationChain: 'eip155:84532',
+      tokensIn: [
+        {
+          address: '0x0000000000000000000000000000000000000000',
+          symbol: 'ETH',
+          amount: '0.0016',
+          chain: 'eip155:11155111',
+          name: 'Ethereum',
+          decimals: 18,
+        },
+      ],
+      tokensOut: [
+        {
+          address: '0x0000000000000000000000000000000000000000',
+          symbol: 'ETH',
+          amount: '0.0015',
+          chain: 'eip155:84532',
+          name: 'Ethereum',
+          decimals: 18,
+        },
+      ],
+    });
+    const remote = swapRecord({
+      recordSource: 'remote',
+      sourceChain: PUSH_CHAIN_ID,
+      destinationChain: 'eip155:84532',
+      tokensIn: [
+        {
+          address: '0x2971824db68229d087931155c2b8bb820b275809',
+          symbol: 'pETH',
+          amount: '0.00158',
+          chain: PUSH_CHAIN_ID,
+        },
+      ],
+      tokensOut: [
+        {
+          address: '0x0000000000000000000000000000000000000000',
+          symbol: 'ETH',
+          amount: '0.00151',
+          chain: 'eip155:84532',
+        },
+      ],
+    });
+
+    const result = mergeSwapActivityRecords([remote], [local]);
+
+    expect(result[0]).toMatchObject({
+      sourceChain: 'eip155:11155111',
+      destinationChain: 'eip155:84532',
+      tokensIn: [
+        {
+          symbol: 'ETH',
+          amount: '0.00158',
+          chain: 'eip155:11155111',
+        },
+      ],
+      tokensOut: [
+        {
+          symbol: 'ETH',
+          amount: '0.00151',
+          chain: 'eip155:84532',
+        },
+      ],
+    });
+  });
+
   it('does not let an unusable remote cost replace a measured explorer cost', () => {
     const explorer = swapRecord({
       networkCost: '0.000288454',
@@ -455,6 +526,12 @@ describe('swap activity date grouping', () => {
 });
 
 describe('swap transaction URLs and hash formatting', () => {
+  it('builds the Push Chain tracking URL from only the transaction hash', () => {
+    expect(buildSwapTrackingUrl(PUSH_CHAIN_ID, HASH_A)).toBe(
+      `https://donut.push.network/track?utx=${HASH_A}`,
+    );
+  });
+
   it('builds the universal transaction tracking URL from a CAIP chain and submitted hash', () => {
     expect(buildSwapTrackingUrl('eip155:11155111', HASH_A)).toBe(
       `https://donut.push.network/track?utx=eip155:11155111:${HASH_A}`,

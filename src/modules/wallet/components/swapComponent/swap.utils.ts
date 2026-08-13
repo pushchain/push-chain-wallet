@@ -1,6 +1,8 @@
 import { PushChain } from '@pushchain/core';
 import { CHAIN } from '@pushchain/core/src/lib/constants/enums';
+import { PublicKey } from '@solana/web3.js';
 import { formatUnits, parseUnits } from 'viem';
+import { isAddress } from 'viem';
 import {
   PUSH_CHAIN_ID,
   PUSH_SWAP_TOKENS,
@@ -42,6 +44,12 @@ export const getSwapChainDisplayName = (
 
 export const getSwapTokenDisplaySymbol = (symbol: string) =>
   symbol.replace(/[._](?:arb|base|bnb|bsc|eth|sol)$/i, '');
+
+export const shortenSwapAddress = (address: string) => {
+  const normalized = address.trim();
+  if (normalized.length <= 12) return normalized;
+  return `${normalized.slice(0, 5)}...${normalized.slice(-5)}`;
+};
 
 export const getSupportedSwapChains = (): SwapChain[] => {
   const result = PushChain.utils.chains.getSupportedChains(
@@ -118,6 +126,29 @@ export const isSameToken = (
 
 export const isValidSwapAmount = (value: string) =>
   /^(?:\d+\.?\d*|\.\d+)$/.test(value) && Number(value) > 0;
+
+export const getSwapRecipientError = (address: string, chain?: string) => {
+  const trimmed = address.trim();
+  if (!trimmed) return '';
+
+  if (chain?.startsWith('solana:')) {
+    try {
+      const publicKey = new PublicKey(trimmed);
+      void publicKey;
+      return '';
+    } catch {
+      return 'Invalid Solana address for the selected destination chain';
+    }
+  }
+
+  if (isPushChain(chain) || chain?.startsWith('eip155:')) {
+    return isAddress(trimmed)
+      ? ''
+      : 'Invalid EVM address for the selected destination chain';
+  }
+
+  return '';
+};
 
 export const normalizeAmountInput = (value: string, decimals: number) => {
   if (value === '') return '';

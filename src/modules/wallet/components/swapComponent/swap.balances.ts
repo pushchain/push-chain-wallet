@@ -25,7 +25,7 @@ import {
 export const SWAP_ACCOUNT_QUERY_ROOT = ['wallet-swap-account'] as const;
 export const SWAP_BALANCE_QUERY_ROOT = ['wallet-swap-balances'] as const;
 
-export const SWAP_BALANCE_STALE_TIME = 15_000;
+export const SWAP_BALANCE_STALE_TIME = 60_000;
 export const SWAP_BALANCE_GC_TIME = 5 * 60_000;
 export const SWAP_ACCOUNT_GC_TIME = 24 * 60 * 60_000;
 

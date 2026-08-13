@@ -57,7 +57,7 @@ export const useSwapTokenBalances = ({
   executorAddress,
   origin,
   enabled = true,
-  refetchInterval = SWAP_BALANCE_STALE_TIME,
+  refetchInterval = false,
 }: UseSwapTokenBalancesParams): UseSwapTokenBalancesResult => {
   const uniqueChains = useMemo(
     () => Array.from(new Set(chains)),

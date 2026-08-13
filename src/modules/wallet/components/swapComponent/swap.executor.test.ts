@@ -169,10 +169,12 @@ describe('swap step execution', () => {
   it('executes an external-to-Push identity route as bridge-only', async () => {
     const { client, sendTransaction } = createClient();
     const userAddress = '0x2222222222222222222222222222222222222222';
+    const receiverAddress = '0x3333333333333333333333333333333333333333';
 
     const result = await executeSwapSteps({
       pushChainClient: client,
       userAddress,
+      pushRecipientAddress: receiverAddress,
       originChain: CHAIN.ETHEREUM_SEPOLIA,
       sourceChain: CHAIN.ETHEREUM_SEPOLIA,
       steps: [pushSteps[0]],
@@ -180,7 +182,7 @@ describe('swap step execution', () => {
 
     expect(sendTransaction).toHaveBeenCalledWith(
       {
-        to: userAddress,
+        to: receiverAddress,
         funds: {
           amount: 1000000000000000n,
           token: sourceToken,
@@ -335,12 +337,82 @@ describe('swap step execution', () => {
     expect(submitted).toHaveBeenCalledWith(pushHash);
   });
 
+  it.each([
+    {
+      description: 'native output with value',
+      token: {
+        chain: CHAIN.ETHEREUM_SEPOLIA,
+        chainName: 'ETHEREUM_SEPOLIA',
+        symbol: 'ETH',
+        address: '0x0000000000000000000000000000000000000000',
+        decimals: 18,
+        mechanism: 'native' as const,
+      },
+      expectedValue: 900000000000000n,
+    },
+    {
+      description: 'ERC-20 output without value',
+      token: {
+        chain: CHAIN.ETHEREUM_SEPOLIA,
+        chainName: 'ETHEREUM_SEPOLIA',
+        symbol: 'USDC',
+        address: '0x9999999999999999999999999999999999999999',
+        decimals: 6,
+        mechanism: 'approve' as const,
+      },
+      expectedValue: undefined,
+    },
+  ])(
+    'executes an outbound-only $description',
+    async ({ token, expectedValue }) => {
+      const { client, sendTransaction } = createClient();
+      const recipient = '0x3333333333333333333333333333333333333333';
+
+      const result = await executeSwapSteps({
+        pushChainClient: client,
+        userAddress: '0x2222222222222222222222222222222222222222',
+        originChain: CHAIN.PUSH_TESTNET_DONUT,
+        sourceChain: CHAIN.PUSH_TESTNET_DONUT,
+        steps: [
+          {
+            type: 'outbound',
+            destinationChain: CHAIN.ETHEREUM_SEPOLIA,
+            recipientAddress: recipient,
+            amountRaw: '900000000000000',
+            tokenSymbol: token.symbol,
+            token,
+          },
+        ],
+      });
+
+      expect(sendTransaction).toHaveBeenCalledWith(
+        {
+          to: {
+            address: recipient,
+            chain: CHAIN.ETHEREUM_SEPOLIA,
+          },
+          ...(expectedValue === undefined
+            ? {}
+            : { value: expectedValue }),
+          funds: {
+            amount: 900000000000000n,
+            token,
+          },
+        },
+        expect.objectContaining({ progressHook: expect.any(Function) }),
+      );
+      expect(result.success).toBe(true);
+    },
+  );
+
   it('cascades bridge, swap, and outbound into one SDK execution', async () => {
     const { client, executeTransactions, prepareTransaction } = createClient();
-    const preparedPush = { route: 'CEA_TO_PUSH' };
+    const preparedInbound = { route: 'CEA_TO_PUSH' };
+    const preparedSwap = { route: 'PUSH_SWAP' };
     const preparedOutbound = { route: 'UOA_TO_CEA' };
     prepareTransaction
-      .mockResolvedValueOnce(preparedPush)
+      .mockResolvedValueOnce(preparedInbound)
+      .mockResolvedValueOnce(preparedSwap)
       .mockResolvedValueOnce(preparedOutbound);
     executeTransactions.mockResolvedValue({
       initialTxHash:
@@ -379,14 +451,14 @@ describe('swap step execution', () => {
       ],
     });
 
-    expect(prepareTransaction).toHaveBeenCalledTimes(2);
+    expect(prepareTransaction).toHaveBeenCalledTimes(3);
     expect(prepareTransaction.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         from: { chain: 'eip155:421614' },
       }),
     );
     expect(executeTransactions).toHaveBeenCalledWith(
-      [preparedPush, preparedOutbound],
+      [preparedInbound, preparedSwap, preparedOutbound],
       expect.objectContaining({
         progressHook: expect.any(Function),
       }),
@@ -461,22 +533,25 @@ describe('swap step execution', () => {
     expect(result.success).toBe(true);
   });
 
-  it('does not prepare a cascade for a native Push signer', async () => {
+  it('uses the same atomic cascade for a native Push signer', async () => {
     const { client, executeTransactions, prepareTransaction, sendTransaction } =
       createClient();
-    sendTransaction
-      .mockResolvedValueOnce({
-        hash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      })
-      .mockResolvedValueOnce({
-        hash: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        wait: vi.fn().mockResolvedValue({
-          status: 1,
-          externalStatus: 'success',
-          externalTxHash:
-            '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-        }),
-      });
+    const preparedSwap = { route: 'PUSH_SWAP' };
+    const preparedOutbound = { route: 'PUSH_TO_CEA' };
+    prepareTransaction
+      .mockResolvedValueOnce(preparedSwap)
+      .mockResolvedValueOnce(preparedOutbound);
+    executeTransactions.mockResolvedValue({
+      initialTxHash:
+        '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      finalTxHash:
+        '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      waitForAll: vi.fn().mockResolvedValue({
+        success: true,
+        finalTxHash:
+          '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      }),
+    });
 
     const result = await executeSwapSteps({
       pushChainClient: client,
@@ -503,42 +578,32 @@ describe('swap step execution', () => {
       ],
     });
 
-    expect(prepareTransaction).not.toHaveBeenCalled();
-    expect(executeTransactions).not.toHaveBeenCalled();
-    expect(sendTransaction).toHaveBeenCalledTimes(2);
-    expect(sendTransaction).toHaveBeenNthCalledWith(
+    expect(prepareTransaction).toHaveBeenCalledTimes(2);
+    expect(prepareTransaction).toHaveBeenNthCalledWith(
       1,
       {
         to: '0x1111111111111111111111111111111111111111',
         value: 0n,
         data: '0x1234',
       },
-      expect.objectContaining({
-        progressHook: expect.any(Function),
-      }),
     );
-    expect(waitForTransactionReceipt).toHaveBeenCalledWith({
-      hash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      timeout: 60_000,
-    });
-    expect(sendTransaction).toHaveBeenNthCalledWith(
+    expect(prepareTransaction).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         to: {
           address: '0x3333333333333333333333333333333333333333',
           chain: 'eip155:84532',
         },
+        value: 900000000000000n,
       }),
+    );
+    expect(executeTransactions).toHaveBeenCalledWith(
+      [preparedSwap, preparedOutbound],
       expect.objectContaining({
         progressHook: expect.any(Function),
       }),
     );
-    expect(sendTransaction.mock.invocationCallOrder[0]).toBeLessThan(
-      waitForTransactionReceipt.mock.invocationCallOrder[0],
-    );
-    expect(waitForTransactionReceipt.mock.invocationCallOrder[0]).toBeLessThan(
-      sendTransaction.mock.invocationCallOrder[1],
-    );
+    expect(sendTransaction).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
   });
 

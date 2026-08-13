@@ -14,7 +14,7 @@ type CompleteSwapRouteParams = {
   steps: readonly SwapStep[];
 };
 
-const RAMEN_SWAP_ABI = [
+export const RAMEN_SWAP_ABI = [
   {
     name: 'exactInputSingle',
     type: 'function',
@@ -91,6 +91,32 @@ const getRamenMinimumOutput = (steps: readonly SwapStep[]) => {
   }
 
   return null;
+};
+
+export const getRamenSwapRecipients = (
+  steps: readonly SwapStep[],
+): string[] => {
+  const recipients: string[] = [];
+
+  for (const step of steps) {
+    if (step.type !== 'swap') continue;
+    try {
+      const decoded = decodeFunctionData({
+        abi: RAMEN_SWAP_ABI,
+        data: step.data,
+      });
+      if (
+        decoded.functionName === 'exactInput' ||
+        decoded.functionName === 'exactInputSingle'
+      ) {
+        recipients.push(decoded.args[0].recipient);
+      }
+    } catch {
+      // Approval, wrapping, and unwrapping are also represented as swap steps.
+    }
+  }
+
+  return recipients;
 };
 
 const synchronizeOutboundMinimum = (steps: SwapStep[]) => {

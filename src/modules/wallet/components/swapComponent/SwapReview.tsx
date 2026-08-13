@@ -21,10 +21,12 @@ import { SwapToken } from './swap.types';
 import {
   getSwapChainDisplayName,
   getSwapTokenDisplaySymbol,
+  shortenSwapAddress,
 } from './swap.utils';
 
 type SwapReviewProps = {
   walletAddress: string;
+  receiverAddress: string;
   amount: string;
   outputAmount: string;
   fromToken: SwapToken;
@@ -148,6 +150,7 @@ const DetailRow: FC<{
 
 const SwapReview: FC<SwapReviewProps> = ({
   walletAddress,
+  receiverAddress,
   amount,
   outputAmount,
   fromToken,
@@ -231,6 +234,20 @@ const SwapReview: FC<SwapReviewProps> = ({
         </Box>
 
         <Box display="flex" flexDirection="column" gap="spacing-xs">
+          <DetailRow label="Receiver">
+            <Text
+              variant="bs-regular"
+              textAlign="right"
+              ellipsis
+              title={receiverAddress}
+              css={css`
+                max-width: 68%;
+              `}
+            >
+              {shortenSwapAddress(receiverAddress)}
+            </Text>
+          </DetailRow>
+
           <Box
             display="flex"
             alignItems="center"
@@ -273,13 +290,13 @@ const SwapReview: FC<SwapReviewProps> = ({
               <Text variant="bs-regular">{gasCostDisplay ?? '—'}</Text>
               {detailsExpanded ? (
                 <CaretUp
-                  size={18}
-                  color="pw-int-icon-secondary-color"
+                  size={20}
+                  color="pw-int-icon-tertiary-color"
                 />
               ) : (
                 <CaretDown
-                  size={18}
-                  color="pw-int-icon-secondary-color"
+                  size={20}
+                  color="pw-int-icon-tertiary-color"
                 />
               )}
             </Box>

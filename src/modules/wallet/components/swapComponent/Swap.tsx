@@ -14,12 +14,13 @@ import {
   Button,
   CaretDown,
   Info,
+  Spinner,
   SwapDashboard as SwapIcon,
   Text,
+  TextInput,
 } from 'blocks';
 import { GasIcon, RamenTextIcon, TokenLogoComponent } from 'common';
 import styled, { css } from 'styled-components';
-import { isAddress } from 'viem';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePushChain } from '../../../../context/PushChainContext';
 import { useSwapTransaction } from '../../../../context/SwapTransactionContext';
@@ -46,6 +47,7 @@ import {
   getSwapFailureDetails,
   SwapFlowError,
 } from './swap.errors';
+import { getSwapFailureSummary } from './swap.failure';
 import { formatSwapGasCost } from './swap.gas';
 import { formatSwapReviewRate } from './swap.review';
 import { SwapToken, SwapTransactionRef } from './swap.types';
@@ -57,6 +59,8 @@ import {
   doesSwapAmountExceedBalance,
   getDestinationTokens,
   getMaxSwapAmount,
+  getSwapChainDisplayName,
+  getSwapRecipientError,
   getSourceTokens,
   getSupportedSwapChains,
   getSwapTokenDisplaySymbol,
@@ -100,20 +104,27 @@ const ResponsiveAmountInput: FC<
     const input = inputRef.current;
     if (!input || input.clientWidth <= 0) return;
 
+    const valueToMeasure = input.value || input.placeholder || '0';
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const styles = window.getComputedStyle(input);
     let fontSize = MAX_AMOUNT_FONT_SIZE;
-    input.style.fontSize = `${fontSize}px`;
+    const availableWidth = Math.max(0, input.clientWidth - 2);
 
-    while (
-      input.scrollWidth > input.clientWidth &&
-      fontSize > MIN_AMOUNT_FONT_SIZE
-    ) {
+    while (fontSize > MIN_AMOUNT_FONT_SIZE) {
+      if (context) {
+        context.font = `${styles.fontWeight} ${fontSize}px ${styles.fontFamily}`;
+        if (context.measureText(valueToMeasure).width <= availableWidth) {
+          break;
+        }
+      } else {
+        input.style.fontSize = `${fontSize}px`;
+        if (input.scrollWidth <= input.clientWidth) break;
+      }
       fontSize -= 1;
-      input.style.fontSize = `${fontSize}px`;
     }
-
-    if (input.scrollWidth <= input.clientWidth) {
-      input.scrollLeft = 0;
-    }
+    input.style.fontSize = `${fontSize}px`;
+    input.scrollLeft = 0;
   }, []);
 
   useLayoutEffect(() => {
@@ -151,15 +162,7 @@ type SwapView = 'form' | 'review';
 type RecipientResolution = 'idle' | 'resolving' | 'resolved' | 'error';
 
 const isValidRecipient = (address: string, chain: string) => {
-  if (!address.trim()) return false;
-  if (chain.startsWith('solana:')) {
-    try {
-      return new PublicKey(address).toBase58() === address;
-    } catch {
-      return false;
-    }
-  }
-  return isAddress(address);
+  return !!address.trim() && !getSwapRecipientError(address, chain);
 };
 
 const hexToBytes = (value: string) => {
@@ -252,6 +255,11 @@ const Swap: FC = () => {
   const [amount, setAmount] = useState('');
   const [debouncedAmount, setDebouncedAmount] = useState('');
   const [recipient, setRecipient] = useState('');
+  const [suggestedRecipient, setSuggestedRecipient] = useState('');
+  const [recipientType, setRecipientType] = useState<
+    'UEA' | 'UOA' | 'CEA' | null
+  >(null);
+  const [recipientEdited, setRecipientEdited] = useState(false);
   const [recipientResolution, setRecipientResolution] =
     useState<RecipientResolution>('idle');
   const previousOriginChain = useRef(originChain);
@@ -300,15 +308,18 @@ const Swap: FC = () => {
   useEffect(() => {
     let cancelled = false;
     const deriveRecipient = async () => {
-      if (!isOutbound || !toToken || !origin || !executorAddress) {
+      if (!toToken || !origin || !executorAddress) {
         if (!cancelled) {
           setRecipient('');
+          setSuggestedRecipient('');
+          setRecipientType(null);
           setRecipientResolution('idle');
         }
         return;
       }
 
-      setRecipient('');
+      setSuggestedRecipient('');
+      setRecipientEdited(false);
       setRecipientResolution('resolving');
 
       try {
@@ -329,6 +340,14 @@ const Swap: FC = () => {
           retry: 1,
         });
         if (!cancelled) {
+          setSuggestedRecipient(address);
+          setRecipientType(
+            isPushChain(toToken.chain)
+              ? 'UEA'
+              : origin.chain === toToken.chain
+                ? 'UOA'
+                : 'CEA',
+          );
           setRecipient(address);
           setRecipientResolution(
             isValidRecipient(address, toToken.chain) ? 'resolved' : 'error',
@@ -340,6 +359,8 @@ const Swap: FC = () => {
             origin.chain === toToken.chain
               ? formatAccountAddress(toToken.chain, origin.address)
               : '';
+          setSuggestedRecipient(fallbackAddress);
+          setRecipientType(fallbackAddress ? 'UOA' : null);
           setRecipient(fallbackAddress);
           setRecipientResolution(
             fallbackAddress &&
@@ -354,7 +375,7 @@ const Swap: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [executorAddress, isOutbound, origin, queryClient, toToken]);
+  }, [executorAddress, origin, queryClient, toToken]);
 
   const quoteRequest = useMemo(
     () => ({
@@ -378,7 +399,15 @@ const Swap: FC = () => {
     queryKey: ['wallet-swap-quote', quoteRequest],
     queryFn: () => fetchSwapQuote(quoteRequest),
     enabled: quoteEnabled,
-    retry: false,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      failureCount < 1 &&
+      error instanceof SwapFlowError &&
+      (error.failure.retryable === true ||
+        error.failure.code === 'POOL_NOT_FOUND'),
+    retryDelay: 750,
   });
   const quotePending =
     !!fromToken &&
@@ -386,8 +415,7 @@ const Swap: FC = () => {
     !isSameToken(fromToken, toToken) &&
     isValidSwapAmount(amount) &&
     (isDebouncing || quote.isFetching);
-  const recipientPending =
-    isOutbound && recipientResolution === 'resolving';
+  const recipientPending = recipientResolution === 'resolving';
   const gasPrice = useQuery({
     queryKey: ['push-chain-gas-price', viemClient.chain.id],
     queryFn: () => viemClient.getGasPrice(),
@@ -403,10 +431,12 @@ const Swap: FC = () => {
   });
 
   const slippage = AUTO_SLIPPAGE_PERCENTAGE;
-  const recipientError =
-    isOutbound && toToken && recipientResolution === 'error'
-      ? `Unable to derive a valid ${toToken.chain.startsWith('solana:') ? 'Solana' : 'EVM'} destination account`
-      : '';
+  const recipientError = toToken
+    ? getSwapRecipientError(recipient, toToken.chain) ||
+      (recipientResolution === 'error' && !recipient.trim()
+        ? `Unable to derive a valid ${toToken.chain.startsWith('solana:') ? 'Solana' : 'EVM'} destination account`
+        : '')
+    : '';
   const amountExceedsBalance =
     !!amount &&
     selectedBalance.balance !== undefined &&
@@ -487,7 +517,8 @@ const Swap: FC = () => {
     !quote.isFetching &&
     !!quote.data &&
     isValidSwapAmount(quote.data.amountOut) &&
-    (!isOutbound || (!!recipient.trim() && !recipientError));
+    !!recipient.trim() &&
+    !recipientError;
 
   useEffect(() => {
     if (isSameToken(fromToken, toToken)) setToToken(null);
@@ -498,7 +529,10 @@ const Swap: FC = () => {
       setFromToken(token);
       if (isSameToken(token, toToken)) setToToken(null);
     }
-    if (selector === 'to') setToToken(token);
+    if (selector === 'to') {
+      setRecipientEdited(false);
+      setToToken(token);
+    }
     setAmount('');
     setDebouncedAmount('');
     setSelector(null);
@@ -517,6 +551,7 @@ const Swap: FC = () => {
     if (!nextFromToken || !nextToToken) return;
 
     setFromToken(nextFromToken);
+    setRecipientEdited(false);
     setToToken(nextToToken);
     setAmount('');
     setDebouncedAmount('');
@@ -582,9 +617,7 @@ const Swap: FC = () => {
       sourceChain: fromToken.chain,
       destinationChain: toToken.chain,
       sourceAddress: sourceAccountAddress || executorAddress,
-      destinationAddress: isOutbound
-        ? recipient.trim()
-        : executorAddress,
+      destinationAddress: recipient.trim(),
       recordSource: 'local',
       transactionRefs: [],
     });
@@ -600,6 +633,7 @@ const Swap: FC = () => {
         toToken: toToken.address,
         amountIn: amount,
         userAddress: executorAddress,
+        recipient: recipient.trim(),
         outboundRecipient: isOutbound ? recipient.trim() : undefined,
         poolResult: quote.data.poolResult,
         maxSlippage: slippage,
@@ -619,6 +653,9 @@ const Swap: FC = () => {
         expectedOutboundRecipient: isOutbound
           ? recipient.trim()
           : undefined,
+        expectedSwapRecipient: isOutbound
+          ? executorAddress
+          : recipient.trim(),
         amountIn: amount,
         steps: executionSteps,
       });
@@ -634,6 +671,9 @@ const Swap: FC = () => {
       const result = await executeSwapSteps({
         pushChainClient,
         userAddress: executorAddress as `0x${string}`,
+        pushRecipientAddress: (isOutbound
+          ? executorAddress
+          : recipient.trim()) as `0x${string}`,
         originChain,
         sourceChain: fromToken.chain,
         steps: executionSteps,
@@ -711,7 +751,6 @@ const Swap: FC = () => {
           });
         },
       });
-
       if (result.success === false) {
         if (result.pending) {
           updateSwapExecution(executionId, {
@@ -898,6 +937,7 @@ const Swap: FC = () => {
     return (
       <SwapReview
         walletAddress={walletAddress}
+        receiverAddress={recipient.trim()}
         amount={amount}
         outputAmount={outputAmount}
         fromToken={fromToken}
@@ -924,16 +964,30 @@ const Swap: FC = () => {
         walletAddress={walletAddress}
         handleBackButton={() => setActiveState('walletDashboard')}
       />
-      <Box display="flex" alignItems="center">
-        <Text variant="h4-semibold">{SWAP_TITLE}</Text>
-      </Box>
-
       <Box
         display="flex"
-        flexDirection="column"
-        gap="spacing-xs"
-        position="relative"
+        alignItems="center"
+        justifyContent="space-between"
       >
+        <Text variant="h4-semibold">{SWAP_TITLE}</Text>
+        <Box display="flex" alignItems="center" gap="spacing-xxxs">
+          <Text variant="c-regular" color="pw-int-text-tertiary-color">
+            powered by
+          </Text>
+          <RamenTextIcon
+            width={58}
+            color="var(--pw-int-text-tertiary-color)"
+          />
+        </Box>
+      </Box>
+
+      <Box display="flex" flexDirection="column" gap="spacing-xs">
+        <Box
+          display="flex"
+          flexDirection="column"
+          gap="spacing-xs"
+          position="relative"
+        >
         <Box
           display="flex"
           flexDirection="column"
@@ -1050,24 +1104,74 @@ const Swap: FC = () => {
             style={{ transform: 'rotate(90deg)' }}
           />
         </Box>
-      </Box>
+        </Box>
 
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="flex-end"
-        gap="spacing-xxxs"
-        css={css`
-          padding-right: var(--spacing-xxxs);
-        `}
-      >
-        <Text variant="c-regular" color="pw-int-text-tertiary-color">
-          powered by
-        </Text>
-        <RamenTextIcon
-          width={58}
-          color="var(--pw-int-text-tertiary-color)"
+        <Box display="flex" flexDirection="column" gap="spacing-xxxs">
+        {recipientEdited && suggestedRecipient && (
+          <Box display="flex" justifyContent="flex-end">
+            <Box
+              cursor="pointer"
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setRecipient(suggestedRecipient);
+                setRecipientEdited(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setRecipient(suggestedRecipient);
+                  setRecipientEdited(false);
+                }
+              }}
+            >
+              <Text variant="bes-regular" color="pw-int-brand-primary-color">
+                Use my address
+              </Text>
+            </Box>
+          </Box>
+        )}
+        <TextInput
+          css={css`
+            > div {
+              background: var(--pw-int-bg-primary-color);
+            }
+          `}
+          value={recipient}
+          placeholder="Enter destination address"
+          error={!!recipientError}
+          errorMessage={recipientError}
+          trailingIcon={
+            recipientPending ? (
+              <Spinner size="small" variant="secondary" />
+            ) : undefined
+          }
+          onChange={(event) => {
+            const nextRecipient = event.target.value;
+            setRecipient(nextRecipient);
+            setRecipientEdited(nextRecipient.trim() !== suggestedRecipient);
+          }}
         />
+        {!recipientError &&
+          recipient.trim() === suggestedRecipient &&
+          recipientType && (
+            <Text variant="cs-regular" color="pw-int-text-tertiary-color">
+              {recipientType === 'UEA'
+                ? 'Pre filled with your Push Chain account linked to the connected wallet.'
+                : recipientType === 'UOA'
+                  ? `Pre filled with your ${
+                      toToken
+                        ? getSwapChainDisplayName(toToken.chain)
+                        : 'destination chain'
+                    } account from the connected wallet.`
+                  : `Pre filled with your ${
+                      toToken
+                        ? getSwapChainDisplayName(toToken.chain)
+                        : 'destination chain'
+                    } sub-account linked to your Push Wallet.`}
+            </Text>
+          )}
+        </Box>
       </Box>
 
       <Box
@@ -1115,7 +1219,7 @@ const Swap: FC = () => {
                   ? 'Unable to load the selected account balance'
                   : recipientError ||
                     (quote.error instanceof Error
-                      ? quote.error.message
+                      ? getSwapFailureSummary(quote.error)
                       : lowLiquidity
                         ? 'Pool liquidity for this pair is low. You may get a worse price or higher slippage'
                         : 'Unable to fetch a quote')}

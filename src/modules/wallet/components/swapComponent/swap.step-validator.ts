@@ -4,6 +4,8 @@ import {
   getSwapChainDisplayName,
   isPushChain,
 } from './swap.utils';
+import { getRamenSwapRecipients } from './swap.route';
+import { PUSH_CHAIN_ID } from './swap.constants';
 
 export type SwapSourceAccountType = 'UOA' | 'UEA' | 'CEA';
 
@@ -26,6 +28,7 @@ export type RamenStepValidationErrorCode =
   | 'OUTBOUND_RECIPIENT_MISMATCH'
   | 'INVALID_OUTBOUND_AMOUNT'
   | 'INVALID_SWAP_VALUE'
+  | 'SWAP_RECIPIENT_MISMATCH'
   | 'INVALID_INPUT_AMOUNT';
 
 export type RamenStepValidationError = {
@@ -62,6 +65,8 @@ export type ValidateRamenSwapStepsParams = {
    * destination and intentionally omitted for a Push Chain destination.
    */
   expectedOutboundRecipient?: string | null;
+  /** Expected recipient encoded in Ramen's Push-side swap calldata. */
+  expectedSwapRecipient?: string | null;
   /**
    * When supplied, the bridge amount is also checked against the exact
    * base-unit representation of the user's input.
@@ -202,6 +207,7 @@ export const validateRamenSwapSteps = ({
   fromToken,
   toToken,
   expectedOutboundRecipient,
+  expectedSwapRecipient,
   amountIn,
   steps,
 }: ValidateRamenSwapStepsParams): RamenStepValidationResult => {
@@ -462,6 +468,24 @@ export const validateRamenSwapSteps = ({
       {
         target: invalidSwapStep.to,
         receivedValue: invalidSwapStep.value,
+      },
+    );
+  }
+
+  const encodedSwapRecipients = getRamenSwapRecipients(swapSteps);
+  const mismatchedSwapRecipient = encodedSwapRecipients.find(
+    (recipient) =>
+      expectedSwapRecipient?.trim() &&
+      !isSameChainAddress(PUSH_CHAIN_ID, recipient, expectedSwapRecipient),
+  );
+  if (mismatchedSwapRecipient) {
+    return fail(
+      sourceAccountType,
+      'SWAP_RECIPIENT_MISMATCH',
+      'The receiver encoded in the swap does not match the destination account selected by the wallet. The swap was stopped before signing.',
+      {
+        expectedRecipient: expectedSwapRecipient?.trim() ?? '',
+        receivedRecipient: mismatchedSwapRecipient,
       },
     );
   }

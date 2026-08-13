@@ -1,7 +1,10 @@
 import { CHAIN } from '@pushchain/core/src/lib/constants/enums';
 import { encodeFunctionData } from 'viem';
 import { describe, expect, it } from 'vitest';
-import { completeWalletSwapRoute } from './swap.route';
+import {
+  completeWalletSwapRoute,
+  getRamenSwapRecipients,
+} from './swap.route';
 import { SwapStep, SwapToken } from './swap.types';
 
 const sourceToken = (chain: string, overrides: Partial<SwapToken> = {}) => ({
@@ -189,5 +192,8 @@ describe('wallet swap route completion', () => {
       type: 'outbound',
       amountRaw: '990000',
     });
+    expect(getRamenSwapRecipients(route)).toEqual([
+      '0x3333333333333333333333333333333333333333',
+    ]);
   });
 });

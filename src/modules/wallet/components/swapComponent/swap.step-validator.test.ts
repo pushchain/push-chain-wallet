@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { encodeFunctionData } from 'viem';
 import { PUSH_CHAIN_ID } from './swap.constants';
+import { RAMEN_SWAP_ABI } from './swap.route';
 import {
   classifySwapSourceAccount,
   ValidateRamenSwapStepsParams,
@@ -133,6 +135,7 @@ const validationParams = ({
   fromToken = ethereumUsdc,
   toToken = pushUsdc,
   expectedOutboundRecipient,
+  expectedSwapRecipient,
   amountIn = '1',
   steps = [bridge(ethereumUsdc), swap()],
 }: Partial<ValidateRamenSwapStepsParams> = {}): ValidateRamenSwapStepsParams => ({
@@ -144,6 +147,7 @@ const validationParams = ({
   expectedOutboundRecipient:
     expectedOutboundRecipient ??
     (destinationChain === PUSH_CHAIN_ID ? undefined : RECIPIENT),
+  expectedSwapRecipient,
   amountIn,
   steps,
 });
@@ -621,5 +625,41 @@ describe('RamenFi route invariant failures', () => {
     },
   ])('rejects $description', ({ code, params }) => {
     expectFailureCode(params, code);
+  });
+
+  it('rejects swap calldata that sends output to a different receiver', () => {
+    const encodedSwap: SwapStep = {
+      type: 'swap',
+      to: '0x6666666666666666666666666666666666666666',
+      value: '0',
+      data: encodeFunctionData({
+        abi: RAMEN_SWAP_ABI,
+        functionName: 'exactInputSingle',
+        args: [
+          {
+            tokenIn: PUSH_USDC,
+            tokenOut: WPC,
+            fee: 3000,
+            recipient: '0x8888888888888888888888888888888888888888',
+            deadline: 1n,
+            amountIn: 1_000_000n,
+            amountOutMinimum: 990_000n,
+            sqrtPriceLimitX96: 0n,
+          },
+        ],
+      }),
+    };
+
+    expectFailureCode(
+      validationParams({
+        sourceChain: PUSH_CHAIN_ID,
+        fromToken: pushUsdc,
+        toToken: pushWpc,
+        amountIn: '1',
+        steps: [encodedSwap],
+        expectedSwapRecipient: RECIPIENT,
+      }),
+      'SWAP_RECIPIENT_MISMATCH',
+    );
   });
 });

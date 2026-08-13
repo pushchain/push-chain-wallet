@@ -197,23 +197,27 @@ const reportHash = (
   });
 };
 
-const resolveOutboundToken = (
-  step: SwapOutboundStep,
-): MoveableToken | null => {
-  if (step.token) return step.token;
-  const { tokens } = PushChain.utils.tokens.getMoveableTokens(
-    step.destinationChain as CHAIN,
-  );
-  return (
-    (tokens?.find((token) => token.symbol === step.tokenSymbol) as
-      | MoveableToken
-      | undefined) ?? null
-  );
+const isNativeMoveableToken = (token: MoveableToken) =>
+  token.mechanism === 'native' ||
+  token.address.toLowerCase() === ZERO_ADDRESS;
+
+const buildOutboundRequest = (step: SwapOutboundStep) => {
+  const amount = parsePositiveAmount(step.amountRaw, 'Outbound amount');
+
+  return {
+    to: {
+      address: step.recipientAddress as Address,
+      chain: step.destinationChain as CHAIN,
+    },
+    ...(isNativeMoveableToken(step.token) ? { value: amount } : {}),
+    funds: { amount, token: step.token },
+  };
 };
 
 export type ExecuteSwapParams = {
   pushChainClient: PushChain;
   userAddress: Address;
+  pushRecipientAddress?: Address;
   originChain?: string | null;
   sourceChain?: string | null;
   steps: SwapStep[];
@@ -224,6 +228,7 @@ export type ExecuteSwapParams = {
 export const executeSwapSteps = async ({
   pushChainClient,
   userAddress,
+  pushRecipientAddress = userAddress,
   originChain,
   sourceChain,
   steps,
@@ -444,55 +449,45 @@ export const executeSwapSteps = async ({
   };
 
   try {
-    if (outboundStep && pushSteps.length && canRelayMulticall) {
-      const token = resolveOutboundToken(outboundStep);
-      if (!token) {
-        return createFailureResult(
-          `No outbound ${outboundStep.tokenSymbol} token is available`,
-          'route-validation',
+    if (outboundStep && pushSteps.length) {
+      // Keep dependent Push calls and the outbound delivery in one SDK
+      // cascade. This is the same execution shape used by the bridge app:
+      // wrap/approve/swap cannot become stale between separate submissions,
+      // and the outbound leg consumes the minimum output atomically.
+      const transactions = [];
+      if (bridgeStep) {
+        transactions.push(
+          await pushChainClient.universal.prepareTransaction({
+            ...(isCeaSource
+              ? { from: { chain: sourceChain as CHAIN } }
+              : {}),
+            to: userAddress,
+            funds: {
+              amount: parsePositiveAmount(
+                bridgeStep.amountRaw,
+                'Bridge amount',
+              ),
+              token: bridgeStep.token,
+            },
+          }),
         );
       }
-
-      const calls = swapSteps.map((step) => ({
-        to: step.to,
-        value: parseValue(step.value),
-        data: step.data,
-      }));
-      const pushTransaction =
-        await pushChainClient.universal.prepareTransaction({
-          ...(isCeaSource
-            ? { from: { chain: sourceChain as CHAIN } }
-            : {}),
-          to: calls.length ? ZERO_ADDRESS : userAddress,
-          ...(bridgeStep
-            ? {
-                funds: {
-                  amount: parsePositiveAmount(
-                    bridgeStep.amountRaw,
-                    'Bridge amount',
-                  ),
-                  token: bridgeStep.token,
-                },
-              }
-            : {}),
-          ...(calls.length ? { data: calls } : {}),
-        });
-      const outboundTransaction =
-        await pushChainClient.universal.prepareTransaction({
-          to: {
-            address: outboundStep.recipientAddress as Address,
-            chain: outboundStep.destinationChain as CHAIN,
-          },
-          funds: {
-            amount: parsePositiveAmount(
-              outboundStep.amountRaw,
-              'Outbound amount',
-            ),
-            token,
-          },
-        });
+      for (const step of swapSteps) {
+        transactions.push(
+          await pushChainClient.universal.prepareTransaction({
+            to: step.to,
+            value: parseValue(step.value),
+            data: step.data,
+          }),
+        );
+      }
+      transactions.push(
+        await pushChainClient.universal.prepareTransaction(
+          buildOutboundRequest(outboundStep),
+        ),
+      );
       const cascade = await pushChainClient.universal.executeTransactions(
-        [pushTransaction, outboundTransaction],
+        transactions,
         { progressHook },
       );
       lastHash = cascade.initialTxHash;
@@ -543,7 +538,7 @@ export const executeSwapSteps = async ({
             ...(isCeaSource
               ? { from: { chain: sourceChain as CHAIN } }
               : {}),
-            to: calls.length ? ZERO_ADDRESS : userAddress,
+            to: calls.length ? ZERO_ADDRESS : pushRecipientAddress,
             ...(bridgeStep
               ? {
                   funds: {
@@ -634,31 +629,10 @@ export const executeSwapSteps = async ({
     }
 
     if (outboundStep) {
-      const token = resolveOutboundToken(outboundStep);
-      if (!token) {
-        return createFailureResult(
-          `No outbound ${outboundStep.tokenSymbol} token is available`,
-          'route-validation',
-        );
-      }
-
       const response = (await pushChainClient.universal.sendTransaction(
-        {
-          to: {
-            address: outboundStep.recipientAddress as Address,
-            chain: outboundStep.destinationChain as CHAIN,
-          },
-          funds: {
-            amount: parsePositiveAmount(
-              outboundStep.amountRaw,
-              'Outbound amount',
-            ),
-            token,
-          },
-        },
+        buildOutboundRequest(outboundStep),
         { progressHook },
       )) as TransactionResponse;
-
       const outboundHash = getTransactionHash(response);
       reportPushTransaction(outboundHash);
       reportSubmitted(outboundHash);

@@ -19,6 +19,7 @@ import {
   SwapActivityRecord,
 } from '../swapComponent/swap.activity';
 import { normalizeExplorerSwapActivity } from '../swapComponent/swap.explorer-activity';
+import { isSwapFundingTransaction } from './walletActivityDedupe';
 
 export type WalletActivityListProps = {
   address: string | null;
@@ -179,7 +180,12 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
     const transactions: UnifiedActivity[] = rawTransactions
       .filter(
         (transaction) =>
-          !swapHashes.has(transaction.hash.toLowerCase()),
+          !swapHashes.has(transaction.hash.toLowerCase()) &&
+          !isSwapFundingTransaction(
+            transaction,
+            decodedSwaps,
+            trackedAddresses,
+          ),
       )
       .map((transaction) => ({
         kind: 'transaction',
@@ -191,7 +197,7 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
     return [...swaps, ...transactions].sort(
       (first, second) => second.timestamp - first.timestamp,
     );
-  }, [decodedSwaps, rawTransactions]);
+  }, [decodedSwaps, rawTransactions, trackedAddresses]);
 
   const groupedActivities = useMemo(
     () => groupActivitiesByDate(unifiedActivities),
@@ -323,7 +329,7 @@ const WalletActivityList: FC<WalletActivityListProps> = ({
                   }}
                   css={css`
                     &:hover {
-                      filter: brightness(0.98);
+                      background-color: var(--pw-int-bg-primary-color);
                     }
                   `}
                 >
