@@ -16,8 +16,8 @@
   <a href="https://discord.com/invite/pushchain">
     <img src="https://img.shields.io/badge/discord-7289da.svg?style=flat-square" alt="discord">
   </a>
-  <a href="https://twitter.com/pushprotocol">
-    <img src="https://img.shields.io/badge/twitter-18a1d6.svg?style=flat-square" alt="twitter">
+  <a href="https://x.com/pushprotocol">
+    <img src="https://img.shields.io/twitter/follow/push-protocol" alt="twitter">
   </a>
   <a href="https://www.youtube.com/@pushprotocol">
     <img src="https://img.shields.io/badge/youtube-d95652.svg?style=flat-square&" alt="youtube">
@@ -119,7 +119,7 @@ We welcome contributions from the community! To contribute, please follow these 
 
 Please ensure your code adheres to our coding standards and includes appropriate tests.
 
-## Licenses
+## License
 
 All crates of this repository are licensed under either of
 
