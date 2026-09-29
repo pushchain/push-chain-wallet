@@ -1,7 +1,7 @@
-import { chains } from "../providers/ethereum/chains";
 import { ChainType, ITypedData } from "../types/wallet.types";
-import { bytesToHex, Chain, hexToBytes, isHash, parseTransaction, toHex } from "viem";
+import { bytesToHex, hexToBytes, isHash, parseTransaction } from "viem";
 import { waitForTxHashFromPendingTxId } from "./waapEvents";
+import { switchOrAddEvmChain } from "../providers/utils/switchEvmChain";
 
 export const getWaapProvider = () => {
   if (typeof window === 'undefined') return null;
@@ -30,39 +30,9 @@ export const getWaapAccount = async (): Promise<`0x${string}`> => {
 };
 
 export const switchNetwork = async (chainName: ChainType) => {
-	const network = chains[chainName] as Chain;
-	const provider = getWaapProvider();
-
-	const hexNetworkId = toHex(network.id);
-
-	const currentChainId = await provider.request({
-		method: "eth_chainId",
-	});
-
-	if (currentChainId === hexNetworkId) return;
-
-	try {
-		await provider.request({
-			method: "wallet_switchEthereumChain",
-			params: [{ chainId: hexNetworkId }]
-		});
-	} catch (err) {
-		try {
-			await provider.request({
-				method: "wallet_addEthereumChain",
-				params: [{
-					chainId: hexNetworkId,
-					chainName: network.name,
-					rpcUrls: network.rpcUrls.default.http,
-					nativeCurrency: network.nativeCurrency,
-					blockExplorerUrls: [network.blockExplorers.default.url]
-				}]
-			});
-		} catch (addError) {
-			console.error("Error switching network:", addError);
-			throw addError
-		}
-	}
+	// Shared with the five EIP-1193 providers so WaaP login gets the same
+	// "switch, add if unknown, switch again" sequence.
+	await switchOrAddEvmChain(getWaapProvider(), chainName);
 };
 
 export const waapSignMessage = async (
