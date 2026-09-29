@@ -2,7 +2,12 @@ import { TransactionType } from "../modules/wallet/Wallet.types";
 
 export type WalletActivityAddress = {
     hash: string;
-    name?: string;
+    name?: string | null;
+    /**
+     * Explorer verification is required before an address name is presented
+     * as contract metadata. Unverified names must never replace an address.
+     */
+    is_verified?: boolean;
 }
 
 export type WalletActivityTokenTransfer = {
@@ -29,8 +34,20 @@ export type WalletActivitiesResponse = {
     to: WalletActivityAddress | null;
     created_contract: WalletActivityAddress | null;
     token_transfers?: WalletActivityTokenTransfer[];
+    /**
+     * Set after checking the immutable transaction receipt logs for the
+     * canonical Uniswap V3 Swap event. Universal transactions alone are not
+     * sufficient evidence that an activity is a swap.
+     */
+    has_swap_event?: boolean;
     timestamp: string;
     gas_used: string;
+    /**
+     * Push Chain charges the UEA through the Cosmos fee module even when the
+     * relayed EVM envelope reports a zero gas price. Together with gas_used,
+     * this recovers the fee that was actually deducted from the UEA.
+     */
+    base_fee_per_gas?: string | number | bigint | null;
     fee: {
         value: string;
     };

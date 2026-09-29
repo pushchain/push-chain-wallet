@@ -1,13 +1,22 @@
 import { Box, DefaultChainMonotone, Doc, ExternalLinkIcon, InternalLink, PushChainMonotone, Text } from '../../../../blocks';
 import { css } from 'styled-components';
-import { convertCaipToObject, getFixedTime } from '../../Wallet.utils';
+import { convertCaipToObject } from '../../Wallet.utils';
 import { centerMaskWalletAddress, CHAIN_MONOTONE_LOGO } from '../../../../common';
 
 import { FC, ReactNode } from 'react';
 import { formatUnits } from 'viem';
 import useUEAOrigin from '../../../../hooks/useUEAOrigin';
 import { TransactionType } from '../../Wallet.types';
-import { WalletActivitiesResponse, WalletActivityTokenTransfer } from '../../../../types/walletactivities.types';
+import {
+    WalletActivitiesResponse,
+    WalletActivityAddress,
+    WalletActivityTokenTransfer,
+} from '../../../../types/walletactivities.types';
+import {
+    getActivityTokenDisplaySymbol,
+    getRelevantActivityTokenTransfer,
+    getVerifiedActivityAddressName,
+} from './walletActivityDisplay';
 
 type WalletActivityListItemProps = {
     transaction: WalletActivitiesResponse
@@ -47,6 +56,13 @@ const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
         displayTransfer.counterpartyAddress ||
         getUEAOriginDisplayAddress(targetOrigin) ||
         '';
+    const hasResolvedUEAAddress =
+        !!getUEAOriginDisplayAddress(counterpartyOrigin) ||
+        (!displayTransfer.counterpartyAddress &&
+            !!getUEAOriginDisplayAddress(targetOrigin));
+    const counterpartyName = hasResolvedUEAAddress
+        ? null
+        : displayTransfer.counterpartyName;
 
     function getChainIcon(chainId) {
         if (chainId == null) {
@@ -101,14 +117,17 @@ const WalletActivityListItem: FC<WalletActivityListItemProps> = ({
                         isUniversalTransaction,
                         isResolvingUniversalTransaction,
                     )}
-                    {renderCounterparty(counterpartyAddress, getChainIcon)}
+                    {renderCounterparty(
+                        counterpartyAddress,
+                        counterpartyName,
+                        getChainIcon,
+                    )}
                 </Box>
             </Box>
-            <Box display="flex" flexDirection="column" gap="spacing-xxxs">
+            <Box display="flex" alignItems="center">
                 <Text variant="bes-regular" textAlign='right'>
                     {displayTransfer.formattedValue} {displayTransfer.symbol}
                 </Text>
-                <Text variant="c-semibold" color='pw-int-icon-tertiary-color' textAlign='right'>{getFixedTime(transaction.timestamp)}</Text>
             </Box>
 
         </Box>
@@ -121,6 +140,7 @@ type DisplayDirection = 'in' | 'out' | 'contract' | 'unknown';
 
 type DisplayTransfer = {
     counterpartyAddress: string;
+    counterpartyName: string | null;
     direction: DisplayDirection;
     formattedValue: string;
     symbol: string;
@@ -143,6 +163,16 @@ const isTrackedWalletAddress = (
 
 const getAddressHash = (addressInfo?: { hash?: string | null } | null) =>
     addressInfo?.hash ?? '';
+
+const getTransferCounterparty = (
+    transfer: WalletActivityTokenTransfer,
+    direction: DisplayDirection,
+): WalletActivityAddress | null | undefined => {
+    if (direction === 'out') return transfer.to;
+    if (direction === 'in') return transfer.from;
+
+    return transfer.to ?? transfer.from;
+}
 
 const getUEACheckAddress = (address?: string | null) => {
     if (!address) return undefined;
@@ -216,20 +246,6 @@ const formatRawTokenValue = (
     return formatDecimalValue(formatUnits(BigInt(rawValue), decimals));
 }
 
-const getRelevantTokenTransfer = (
-    transaction: WalletActivitiesResponse,
-    walletAddresses: string[],
-) => {
-    const tokenTransfers = transaction.token_transfers ?? [];
-
-    return (
-        tokenTransfers.find((transfer) =>
-            isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.from)) ||
-            isTrackedWalletAddress(walletAddresses, getAddressHash(transfer.to))
-        ) ?? tokenTransfers[0]
-    );
-}
-
 const getTokenTransferDirection = (
     transfer: WalletActivityTokenTransfer,
     walletAddresses: string[],
@@ -255,23 +271,22 @@ const getDisplayTransfer = (
     transaction: WalletActivitiesResponse,
     walletAddresses: string[],
 ): DisplayTransfer => {
-    const tokenTransfer = getRelevantTokenTransfer(transaction, walletAddresses);
+    const tokenTransfer = getRelevantActivityTokenTransfer(
+        transaction,
+        walletAddresses,
+    );
 
     if (tokenTransfer) {
         const direction = getTokenTransferDirection(tokenTransfer, walletAddresses);
-        const counterpartyAddress =
-            direction === 'out'
-                ? getAddressHash(tokenTransfer.to)
-                : direction === 'in'
-                    ? getAddressHash(tokenTransfer.from)
-                    : getAddressHash(tokenTransfer.to) || getAddressHash(tokenTransfer.from);
+        const counterparty = getTransferCounterparty(tokenTransfer, direction);
         const decimals = normalizeDecimals(
             tokenTransfer.total?.decimals ?? tokenTransfer.token?.decimals,
         );
-        const symbol = tokenTransfer.token?.symbol || 'Token';
+        const symbol = getActivityTokenDisplaySymbol(tokenTransfer);
 
         return {
-            counterpartyAddress,
+            counterpartyAddress: getAddressHash(counterparty),
+            counterpartyName: getVerifiedActivityAddressName(counterparty),
             direction,
             formattedValue: formatRawTokenValue(tokenTransfer.total?.value, decimals),
             symbol,
@@ -279,15 +294,16 @@ const getDisplayTransfer = (
     }
 
     const direction = getTransactionDirection(transaction, walletAddresses);
-    const counterpartyAddress =
+    const counterparty =
         direction === 'out'
-            ? getAddressHash(transaction.to) || getAddressHash(transaction.created_contract)
+            ? transaction.to ?? transaction.created_contract
             : direction === 'in'
-                ? getAddressHash(transaction.from)
-                : getAddressHash(transaction.created_contract) || getAddressHash(transaction.to);
+                ? transaction.from
+                : transaction.created_contract ?? transaction.to;
 
     return {
-        counterpartyAddress,
+        counterpartyAddress: getAddressHash(counterparty),
+        counterpartyName: getVerifiedActivityAddressName(counterparty),
         direction,
         formattedValue: formatRawTokenValue(transaction.value, 18),
         symbol: 'PC',
@@ -326,6 +342,7 @@ const getUEAOriginDisplayAddress = (
 
 const renderCounterparty = (
     displayAddress: string,
+    displayName: string | null,
     getChainIcon: (chainId: string | null) => ReactNode,
 ) => {
     if (!displayAddress) return null;
@@ -350,7 +367,7 @@ const renderCounterparty = (
             </Box>
 
             <Text color="pw-int-text-secondary-color" variant="bes-semibold">
-                {centerMaskWalletAddress(addressToShow)}
+                {displayName || centerMaskWalletAddress(addressToShow)}
             </Text>
         </Box>
     );

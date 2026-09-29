@@ -15,6 +15,7 @@ export const textColorSemantics = {
   'danger-subtle-color': { light: colorBrands['danger-100'], dark: colorBrands['danger-700'] },
   'danger-bold-color': { light: colorBrands['danger-700'], dark: colorBrands['danger-300'] },
 
+  'info-bold-color': { light: colorBrands['info-700'], dark: colorBrands['info-100'] },
 
 };
 

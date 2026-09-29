@@ -23,7 +23,13 @@ import { Box, } from "blocks";
 import { Receive } from "./components/Receive";
 import { Send } from "./components/sendComponent/Send";
 import { WalletDashboardProvider } from "../../context/WalletDashboardContext";
-import { ActiveStates, PushNetworks, WalletListType } from "src/types";
+import { SwapTransactionProvider } from "../../context/SwapTransactionContext";
+import {
+  ActiveStates,
+  PushNetworks,
+  WalletDashboardTab,
+  WalletListType,
+} from "src/types";
 import { bytesToHex, stringToBytes } from "viem";
 import { Reconnect } from "./components/Reconnect";
 import WalletRecoveryPhrase from "./components/WalletRecoveryPhrase";
@@ -33,6 +39,8 @@ import {
   trackWalletEvent,
   WALLET_EVENTS,
 } from "../../analytics/walletEvents";
+import { Swap } from "./components/swapComponent/Swap";
+import { SwapDetails } from "./components/swapComponent/SwapDetails";
 
 export type WalletProps = Record<string, never>;
 
@@ -58,6 +66,8 @@ const Wallet: FC<WalletProps> = () => {
   const navigate = useNavigate();
   const persistQuery = usePersistedQuery();
   const [activeState, setActiveState] = useState<ActiveStates>('walletDashboard');
+  const [activeDashboardTab, setActiveDashboardTab] =
+    useState<WalletDashboardTab>('tokens');
   const [selectedNetwork, setSelectedNetwork] = useState<PushNetworks>('Push Testnet Donut');
   const [sendTokenSelection, setSendTokenSelection] = useState<TokenDetails | null>(null);
 
@@ -348,26 +358,32 @@ const Wallet: FC<WalletProps> = () => {
             startSendFlow={startSendFlow}
             selectedNetwork={selectedNetwork}
             setSelectedNetwork={setSelectedNetwork}
+            activeDashboardTab={activeDashboardTab}
+            setActiveDashboardTab={setActiveDashboardTab}
           >
-            {activeState === 'walletDashboard' && <WalletDashboard />}
-            {activeState === 'addTokens' && <AddTokens />}
-            {activeState === 'receive' && <Receive />}
-            {activeState === 'send' && <Send initialTokenDetails={sendTokenSelection} />}
-            {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
-            <Reconnect />
-            {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (
-              <UpgradeDrawer
-                currentVersion={state.upgradeInfo.currentVersion}
-                newVersion={state.upgradeInfo.newVersion}
-                onUpgrade={async () => {
-                  await pushChainClient.upgradeAccount();
-                  dispatch({ type: "HIDE_UPGRADE_DRAWER" });
-                }}
-                onCancel={() => {
-                  dispatch({ type: "HIDE_UPGRADE_DRAWER" });
-                }}
-              />
-            )}
+            <SwapTransactionProvider>
+              {activeState === 'walletDashboard' && <WalletDashboard />}
+              {activeState === 'addTokens' && <AddTokens />}
+              {activeState === 'receive' && <Receive />}
+              {activeState === 'send' && <Send initialTokenDetails={sendTokenSelection} />}
+              {activeState === 'swap' && <Swap />}
+              {activeState === 'swapDetails' && <SwapDetails />}
+              {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
+              <Reconnect />
+              {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (
+                <UpgradeDrawer
+                  currentVersion={state.upgradeInfo.currentVersion}
+                  newVersion={state.upgradeInfo.newVersion}
+                  onUpgrade={async () => {
+                    await pushChainClient.upgradeAccount();
+                    dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                  }}
+                  onCancel={() => {
+                    dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                  }}
+                />
+              )}
+            </SwapTransactionProvider>
           </WalletDashboardProvider>
         </Box>
       </BoxLayout>

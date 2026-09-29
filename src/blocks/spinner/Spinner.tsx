@@ -45,7 +45,16 @@ const Container = styled.div<{ css?: FlattenSimpleInterpolation; size: SpinnerSi
   /* Custom CSS applied via styled component css prop */
   ${(props) => props.css || ''};
 `;
-const Spinner: React.FC<SpinnerProps> = ({ size = 'small', css, variant }) => {
+const Spinner: React.FC<SpinnerProps> = ({
+  size = 'small',
+  css,
+  variant = 'primary',
+}) => {
+  const color =
+    variant === 'primary'
+      ? 'pw-int-spinner-icon-primary'
+      : 'pw-int-spinner-icon-secondary';
+
   return (
     <Container
       size={size}
@@ -53,7 +62,7 @@ const Spinner: React.FC<SpinnerProps> = ({ size = 'small', css, variant }) => {
       variant={variant}
       role="spinner"
     >
-      <Ellipse size={getSpinnerSize(size)} />
+      <Ellipse size={getSpinnerSize(size)} color={color} />
     </Container>
   );
 };

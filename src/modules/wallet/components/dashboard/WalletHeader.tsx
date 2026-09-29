@@ -90,7 +90,7 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
         <Box
             display="flex"
             justifyContent={activeState === "walletDashboard" ? "space-between" : "flex-start"}
-            alignItems="flex-start"
+            alignItems="center"
             width={{initial: showCloseButton ? "90%" : "100%", mm: "100%"}}
             gap="spacing-xxs"
         >

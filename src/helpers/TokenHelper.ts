@@ -78,6 +78,40 @@ export const fetchTokenBalance = async ({
     try {
 
         if (!tokenAddress) {
+            if (walletDetails?.chain?.toLowerCase() === 'solana') {
+                const connection = new Connection('https://api.devnet.solana.com');
+                const lamports = await connection.getBalance(
+                    new PublicKey(walletDetails.address),
+                );
+
+                return formatUnits(BigInt(lamports), decimals);
+            }
+
+            if (walletDetails) {
+                const chainId = Number(walletDetails.chainId) || 42101;
+                const chain = EVM_CHAIN_CONFIGS[chainId];
+                if (!chain) {
+                    throw new Error(`Unsupported EVM chain: ${chainId}`);
+                }
+                const rpcUrl =
+                    chain?.rpcUrls?.public?.http?.[0] ??
+                    chain?.rpcUrls?.default?.http?.[0];
+                const client = createPublicClient({
+                    chain,
+                    transport: !rpcUrl
+                        ? http()
+                        : http(rpcUrl, {
+                              retryCount: 3,
+                              retryDelay: 30_000,
+                          }),
+                });
+                const nativeBalance = await client.getBalance({
+                    address: walletDetails.address as `0x${string}`,
+                });
+
+                return formatUnits(nativeBalance, decimals);
+            }
+
             const nativeBalance = await viemClient.getBalance({
                 address: walletAddress as `0x${string}`,
             });

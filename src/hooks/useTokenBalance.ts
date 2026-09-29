@@ -37,7 +37,7 @@ export const useTokenBalance = (
         },
         enabled: shouldFetchBalance,
         refetchInterval: pollMs,
-        refetchIntervalInBackground: true,
+        refetchIntervalInBackground: false,
         staleTime: pollMs - 1000,
     });
 };

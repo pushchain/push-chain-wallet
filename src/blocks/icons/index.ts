@@ -183,6 +183,7 @@ export { default as Settings } from "./components/Settings";
 export { default as Stopwatch } from "./components/Stopwatch";
 
 export { default as Swap } from "./components/Swap";
+export { default as SwapDashboard } from "./components/SwapDashboard";
 
 export { default as Tick } from "./components/Tick";
 export { default as TickCircleFilled } from "./components/TickCircleFilled";

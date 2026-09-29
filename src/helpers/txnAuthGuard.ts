@@ -1,10 +1,11 @@
 import { PushChain } from "@pushchain/core";
 import { UniversalSigner } from "@pushchain/core/src/lib/universal/universal.types";
+import type { GlobalAction } from "../context/GlobalContext";
 import { ExternalWalletType } from "../types/wallet.types";
 
 export async function checkAndShowUpgradeIfNeeded(
   pushChainClient: PushChain,
-  dispatch?: (action: any) => void,
+  dispatch?: (action: GlobalAction) => void,
 ): Promise<boolean> {
   await pushChainClient.accountStatusReady;
   if (!pushChainClient.isReadMode && pushChainClient.accountStatus.uea.loaded && pushChainClient.accountStatus.uea.requiresUpgrade) {
@@ -26,9 +27,9 @@ export function createGuardedPushChain(
 	handleReconnectExternalWallet: (walletData: ExternalWalletType) => Promise<void>,
 	handleReconnectWallet: () => void,
 	universalSigner: UniversalSigner,
-	intializeProps: any,
+	intializeProps: Parameters<PushChain["reinitialize"]>[1],
 	callback?: () => void,
-	dispatch?: (action: any) => void,
+	dispatch?: (action: GlobalAction) => void,
 ): PushChain {
   const clientRef: { current: PushChain } = { current: baseClient };
 
@@ -85,10 +86,17 @@ export function createGuardedPushChain(
 	};
 
   const universalProxy = new Proxy({} as PushChain["universal"], {
-    get(_t, p, _r) {
+    get(target, p) {
+      void target;
       const u = clientRef.current.universal;
       if (p === "sendTransaction") {
         return wrapWrite(() => clientRef.current.universal.sendTransaction);
+      }
+      if (p === "prepareTransaction") {
+        return wrapWrite(() => clientRef.current.universal.prepareTransaction);
+      }
+      if (p === "executeTransactions") {
+        return wrapWrite(() => clientRef.current.universal.executeTransactions);
       }
       if (p === "signMessage") {
         return wrapWrite(() => clientRef.current.universal.signMessage);
@@ -101,7 +109,8 @@ export function createGuardedPushChain(
   });
 
   const clientProxy = new Proxy(baseClient, {
-    get(_target, prop, _receiver) {
+    get(target, prop) {
+      void target;
       if (prop === "universal") return universalProxy;
       return clientRef.current[prop];
     },
