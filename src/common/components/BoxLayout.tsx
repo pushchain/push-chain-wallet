@@ -92,11 +92,16 @@ const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
       >
         {showCloseButton && (
           <Box
-            display={{initial: 'block', mm: executorAddress ? 'none' : 'block'}}
+            display={{initial: 'flex', mm: executorAddress ? 'none' : 'flex'}}
+            alignItems="center"
+            justifyContent="center"
+            width="24px"
+            height="24px"
             position="absolute"
             cursor="pointer"
             css={css`
-              top: var(--spacing-md);
+              /* Match the centerline of the 44px wallet header row. */
+              top: calc(var(--spacing-md) + 7px);
               right: var(--spacing-md);
               z-index: 99;
             `}

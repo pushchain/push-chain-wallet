@@ -168,7 +168,9 @@ export const CHAIN_LOGO: {
 
 export const TOKEN_LOGO = {
   ETH: Ethereum,
+  SepoliaETH: Ethereum,
   BNB: BNB,
+  TBNB: BNB,
   SOL: Solana,
   pETH: Ethereum,
   "pETH.arb": Ethereum,
