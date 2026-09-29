@@ -110,7 +110,7 @@ export class WalletConnectProvider extends BaseWalletProvider {
     };
 
     switchNetwork = async (chainName: ChainType) => {
-      await switchOrAddEvmChain(this.getProvider(), chainName);
+        await switchOrAddEvmChain(this.getProvider(), chainName);
     };
 
     signAndSendTransaction = async (txn: Uint8Array): Promise<Uint8Array> => {

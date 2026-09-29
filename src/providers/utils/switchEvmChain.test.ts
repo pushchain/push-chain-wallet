@@ -5,6 +5,8 @@ import { isUnknownChainError, switchOrAddEvmChain } from './switchEvmChain';
 const SEPOLIA_HEX = '0xaa36a7';
 const DONUT_HEX = '0xa475'; // 42101
 
+type Request = { method: string; params?: [{ chainId: string } & Record<string, unknown>] };
+
 const walletError = (code: number, message = 'error') =>
   Object.assign(new Error(message), { code });
 
@@ -13,11 +15,11 @@ const walletError = (code: number, message = 'error') =>
  * and only changes chain on an explicit switch.
  */
 function makeWallet(firstSwitchError?: Error, addError?: Error) {
-  const calls: { method: string; params?: any[] }[] = [];
+  const calls: Request[] = [];
   let current = '0x1';
   let failNextSwitch = !!firstSwitchError;
 
-  const request = vi.fn(async ({ method, params }: { method: string; params?: any[] }) => {
+  const request = vi.fn(async ({ method, params }: Request) => {
     calls.push({ method, params });
     if (method === 'wallet_switchEthereumChain') {
       if (failNextSwitch) {
