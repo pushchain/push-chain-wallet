@@ -963,30 +963,30 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@human.tech/waap-constants@npm:0.1.2":
-  version: 0.1.2
-  resolution: "@human.tech/waap-constants@npm:0.1.2"
+"@human.tech/waap-constants@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@human.tech/waap-constants@npm:1.0.0"
   dependencies:
-    "@human.tech/waap-interface-core": "npm:0.3.0"
-  checksum: 10/6b6c15c833f31222fe28118d1cd09b79b54f9529717d30ddcd8bf3b3d8e039d30aacdd62e70e8484ec4b7fa48a7b0ecb3a4a790810bee1db968653227f8202ca
+    "@human.tech/waap-interface-core": "npm:1.0.0"
+  checksum: 10/5f641f9bc42f8ab84a26b8d2e74f2f0cc7b23c4c95c5c4356560a5cbeeb7454753a575034732166a2e4ac54e4935cb5f8ef3ad3abe165005aacb40edcae8f7b0
   languageName: node
   linkType: hard
 
-"@human.tech/waap-interface-core@npm:0.3.0":
-  version: 0.3.0
-  resolution: "@human.tech/waap-interface-core@npm:0.3.0"
+"@human.tech/waap-interface-core@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@human.tech/waap-interface-core@npm:1.0.0"
   dependencies:
     crypto-js: "npm:^4.2.0"
-  checksum: 10/a11e84a8982875d97d8008ab69ff93cdd19a19f7736e3de48c4a78596c44a7ed83c63f8f8a2f5c06b4aa96a19f4b33dc51918301496cbb8597ad554330ffc862
+  checksum: 10/06e7d0a49045b7d38cb13eb0c6e5b8feeeb507992cd5f7532317b3c9c09957e31d5d3206fbea0652c0c17312b3938577a5886e484aad22be8be3ed3a9e5bfdca
   languageName: node
   linkType: hard
 
-"@human.tech/waap-sdk@npm:^1.3.0":
-  version: 1.3.0
-  resolution: "@human.tech/waap-sdk@npm:1.3.0"
+"@human.tech/waap-sdk@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@human.tech/waap-sdk@npm:2.0.0"
   dependencies:
-    "@human.tech/waap-constants": "npm:0.1.2"
-    "@human.tech/waap-interface-core": "npm:0.3.0"
+    "@human.tech/waap-constants": "npm:1.0.0"
+    "@human.tech/waap-interface-core": "npm:1.0.0"
     "@metamask/rpc-errors": "npm:^5.1.1"
     "@mysten/sui": "npm:^1.45.2"
     "@mysten/wallet-standard": "npm:^0.13.0"
@@ -1002,7 +1002,7 @@ __metadata:
   peerDependenciesMeta:
     react:
       optional: true
-  checksum: 10/efdfc37a9ae0906ba4e3702a4128815c528d3e575cc94764289e4ae58eb04f21550055811ec0f958fe384b4f45e3851548900627a3101ac13be39fbc8cdc37c1
+  checksum: 10/6dd4c1ace183ef15b90c41010e373a727329ca78ec11f9138be83ce01a45657ac38ced1d2145803c575bf7ddd82a506956e524fcd4c05e8d27828eb5b1bfd883
   languageName: node
   linkType: hard
 
@@ -9227,7 +9227,7 @@ __metadata:
     "@coral-xyz/anchor": "npm:^0.31.1"
     "@dynamic-labs/iconic": "npm:^3.6.1"
     "@dynamic-labs/sdk-react-core": "npm:^3.3.0"
-    "@human.tech/waap-sdk": "npm:^1.3.0"
+    "@human.tech/waap-sdk": "npm:^2.0.0"
     "@metamask/jazzicon": "npm:^2.0.0"
     "@metamask/sdk": "npm:^0.32.0"
     "@noble/hashes": "npm:^1.0.0"

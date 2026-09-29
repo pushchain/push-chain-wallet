@@ -14,6 +14,11 @@ export const WALLET_EVENTS = {
   SEND_SUCCESSFUL: 'wallet_send_successful',
   SEND_FAILED: 'wallet_send_failed',
   SEND_VIEW_TRANSACTION_CLICKED: 'wallet_send_view_transaction_clicked',
+  SWAP_CLICKED: 'wallet_swap_clicked',
+  SWAP_REVIEW_CLICKED: 'wallet_swap_review_clicked',
+  SWAP_TRANSACTION_SUBMITTED: 'wallet_swap_transaction_submitted',
+  SWAP_SUCCESSFUL: 'wallet_swap_successful',
+  SWAP_FAILED: 'wallet_swap_failed',
 } as const;
 
 export type WalletEventName = typeof WALLET_EVENTS[keyof typeof WALLET_EVENTS];

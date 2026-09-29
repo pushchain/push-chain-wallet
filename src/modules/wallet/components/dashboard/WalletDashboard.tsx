@@ -8,6 +8,7 @@ import { ConnectionSuccess } from '../../../../common/components/ConnectionSucce
 import { useGlobalState } from '../../../../context/GlobalContext';
 import { useWalletDashboard } from '../../../../context/WalletDashboardContext';
 import { usePushChain } from '../../../../context/PushChainContext';
+import { SwapTransactionDrawer } from '../swapComponent/SwapTransactionDrawer';
 
 const WalletDashboard: FC = () => {
     const { state, dispatch } = useGlobalState();
@@ -57,6 +58,7 @@ const WalletDashboard: FC = () => {
                 setSelectedWallet={setSelectedWallet}
                 setActiveState={setActiveState}
             />
+            <SwapTransactionDrawer />
             {/* {!state?.wallet && primaryWallet && (
             <CreateAccount
               isLoading={createAccountLoading}
