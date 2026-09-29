@@ -173,6 +173,26 @@ export const EVM_CHAIN_CONFIGS = {
   42101: pushTestnetChain,
 };
 
+/**
+ * Render a native balance as a plain decimal string with no thousands
+ * separators.
+ *
+ * Callers of getNativeTokenBalance feed this value back into Number() (Max
+ * button, balance labels, insufficient-balance checks), so the value has to
+ * stay machine-parseable. Display sites apply their own toLocaleString.
+ */
+export function toPlainDecimalString(
+  value: number,
+  maxFractionDigits: number
+): string {
+  if (!Number.isFinite(value)) return '0';
+
+  const fixed = value.toFixed(maxFractionDigits);
+  if (!fixed.includes('.')) return fixed;
+
+  return fixed.replace(/0+$/, '').replace(/\.$/, '');
+}
+
 export async function getNativeTokenBalance(token, walletDetail): Promise<{ balance: string, loading: boolean }> {
   if (!token || !walletDetail || token.address !== '') {
     return { balance: '0', loading: false };
@@ -187,7 +207,7 @@ export async function getNativeTokenBalance(token, walletDetail): Promise<{ bala
       const lamports = await connection.getBalance(publicKey);
       const sol = lamports / 1e9;
       return {
-        balance: sol.toLocaleString(undefined, { maximumFractionDigits: 6 }),
+        balance: toPlainDecimalString(sol, 6),
         loading: false
       };
     } else {
@@ -205,7 +225,7 @@ export async function getNativeTokenBalance(token, walletDetail): Promise<{ bala
       const wei = await client.getBalance({ address: walletDetail.address });
       const eth = Number(wei) / 1e18;
       return {
-        balance: eth.toLocaleString(undefined, { maximumFractionDigits: 6 }),
+        balance: toPlainDecimalString(eth, 6),
         loading: false
       };
     }
