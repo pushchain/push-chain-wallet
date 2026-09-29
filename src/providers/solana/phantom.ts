@@ -260,9 +260,13 @@ export class PhantomProvider extends BaseWalletProvider {
       throw new Error('signTypedData is not implemented for this provider');
     } else if (this.connectedChainType === ChainType.ETHEREUM && window.phantom?.ethereum) {
       try {
+        const provider = window.phantom?.ethereum;
+        if (!provider) {
+          throw new Error('No Phantom Ethereum wallet connected');
+        }
         const walletClient = createWalletClient({
           chain: chains.sepolia,
-          transport: custom(window.ethereum!),
+          transport: custom(provider),
         })
 
         const accounts = await walletClient.request({
