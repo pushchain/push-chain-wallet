@@ -73,7 +73,7 @@ describe('MetamaskProvider.switchNetwork', () => {
 		expect(params.blockExplorerUrls).toEqual(['https://sepolia.etherscan.io']);
 	});
 
-	it('does not call add when the wallet is already on the chain', async () => {
+	it('does not call add when the switch succeeds', async () => {
 		const mock = makeProvider({ switchErrorOnFirst: false });
 		const provider = providerWith(() => mock);
 

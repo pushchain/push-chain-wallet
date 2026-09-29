@@ -3,14 +3,12 @@ import {
   bytesToHex,
   hexToBytes,
   parseTransaction,
-  toHex,
-  type Chain,
 } from "viem";
 
 import { ChainType, ITypedData } from "../../types/wallet.types";
 import { BaseWalletProvider } from "../BaseWalletProvider";
-import { chains } from "./chains";
 import { getEIP6963ProviderByRdns } from "../utils/eip6963";
+import { switchOrAddEvmChain } from "../utils/switchEvmChain";
 
 export class ZerionProvider extends BaseWalletProvider {
   constructor() {
@@ -82,53 +80,7 @@ export class ZerionProvider extends BaseWalletProvider {
   };
 
   switchNetwork = async (chainName: ChainType) => {
-    const network = chains[chainName] as Chain;
-    const provider = this.getProvider();
-
-    const hexNetworkId = toHex(network.id);
-
-    try {
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: hexNetworkId }],
-      });
-    } catch (err) {
-      const msg = String(err?.message ?? "");
-      const needAdd =
-        err?.code === 4902 ||
-        err?.code === -32603 ||
-        msg.includes("Unrecognized chain ID");
-
-      if (!needAdd) {
-        console.error("Error switching network:", err);
-        throw err;
-      }
-
-      try {
-				await provider.request({
-					method: "wallet_addEthereumChain",
-					params: [
-						{
-							chainId: hexNetworkId,
-							chainName: network.name,
-							rpcUrls: network.rpcUrls.default.http,
-							nativeCurrency: network.nativeCurrency,
-							blockExplorerUrls: network.blockExplorers?.default?.url
-								? [network.blockExplorers.default.url]
-								: [],
-						},
-					],
-				});
-
-				await provider.request({
-					method: "wallet_switchEthereumChain",
-					params: [{ chainId: hexNetworkId }],
-				});
-			} catch (addError) {
-				console.error("Error adding network:", addError);
-				throw addError
-			}
-    }
+    await switchOrAddEvmChain(this.getProvider(), chainName);
   };
 
   signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
