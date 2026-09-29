@@ -3,7 +3,8 @@ import { getAddress } from 'ethers';
 import { ChainType, ITypedData } from '../../types/wallet.types';
 import { BaseWalletProvider } from '../BaseWalletProvider';
 import * as chains from 'viem/chains';
-import { hexToBytes, parseTransaction, toHex } from 'viem';
+import { hexToBytes, parseTransaction } from 'viem';
+import { switchOrAddEvmChain } from '../utils/switchEvmChain';
 
 export class WalletConnectProvider extends BaseWalletProvider {
     private provider: InstanceType<typeof EthereumProvider> | null = null;
@@ -108,40 +109,8 @@ export class WalletConnectProvider extends BaseWalletProvider {
         return chainId;
     };
 
-    switchNetwork = async (chainType: ChainType) => {
-        const provider = this.getProvider();
-        const network = chains[chainType] as chains.Chain;
-        const hexChainId = toHex(network.id);
-
-        try {
-            await provider.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: hexChainId }],
-            });
-        } catch (err: any) {
-            if (err.code === 4902) {
-                try {
-                    await provider.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [
-                            {
-                                chainId: hexChainId,
-                                chainName: network.name,
-                                rpcUrls: network.rpcUrls.default.http,
-                                nativeCurrency: network.nativeCurrency,
-                                blockExplorerUrls: [network.blockExplorers.default.url],
-                            },
-                        ],
-                    });
-                } catch (addError) {
-                    console.error('Error adding network:', addError);
-                    throw addError;
-                }
-            } else {
-                console.error('Error switching network:', err);
-                throw err;
-            }
-        }
+    switchNetwork = async (chainName: ChainType) => {
+        await switchOrAddEvmChain(this.getProvider(), chainName);
     };
 
     signAndSendTransaction = async (txn: Uint8Array): Promise<Uint8Array> => {

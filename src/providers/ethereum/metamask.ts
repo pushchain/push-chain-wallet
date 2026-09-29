@@ -3,10 +3,8 @@ import { ChainType, ITypedData } from "../../types/wallet.types";
 import { BaseWalletProvider } from "../BaseWalletProvider";
 import { bytesToHex, hexToBytes, parseTransaction } from "viem";
 import { BrowserProvider } from 'ethers';
-import { Chain } from 'viem';
-import { chains } from "./chains";
-import { toHex } from "viem";
 import { getAddress } from 'ethers';
+import { switchOrAddEvmChain } from "../utils/switchEvmChain";
 
 declare global {
   interface Window {
@@ -97,58 +95,8 @@ export class MetamaskProvider extends BaseWalletProvider {
   }
 
   switchNetwork = async (chainName: ChainType) => {
-    const network = chains[chainName] as Chain;
-    const provider = this.getProvider();
-
-    const hexNetworkId = toHex(network.id);
-
-    try {
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: hexNetworkId }]
-      });
-    } catch (err) {
-      const msg = String(err?.message ?? '');
-      const needAdd =
-        err?.code === 4902 ||
-        err?.code === -32603 ||
-        msg.includes('Unrecognized chain ID');
-
-      if (!needAdd) {
-        console.error("Error switching network:", err);
-        throw err;
-      }
-
-      try {
-        await provider.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: hexNetworkId,
-            chainName: network.name,
-            rpcUrls: network.rpcUrls.default.http,
-            nativeCurrency: network.nativeCurrency,
-            // EIP-3085 declares blockExplorerUrls as string[]; a bare string
-            // is rejected by the wallet, so the add never lands.
-            blockExplorerUrls: network.blockExplorers?.default?.url
-              ? [network.blockExplorers.default.url]
-              : []
-          }]
-        });
-
-        // Adding a chain does not switch to it (EIP-3085). Without this second
-        // switch the wallet stays on the old chain and the next transaction is
-        // sent to the wrong network.
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: hexNetworkId }]
-        });
-      } catch (addError) {
-        console.error("Error adding network:", addError);
-        throw addError
-      }
-    }
-
-  }
+    await switchOrAddEvmChain(this.getProvider(), chainName);
+  };
 
   signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
     try {

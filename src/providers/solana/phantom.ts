@@ -11,6 +11,7 @@ import {
   openPhantomMobileBrowser,
   shouldOpenPhantomMobileBrowser,
 } from "./phantomMobile";
+import { switchOrAddEvmChain } from "../utils/switchEvmChain";
 
 declare global {
   interface Window {
@@ -130,43 +131,8 @@ export class PhantomProvider extends BaseWalletProvider {
   };
 
   switchNetwork = async (chainName: ChainType) => {
-    const network = chains[chainName] as chains.Chain
-
-    if (!window.phantom || !window.phantom?.ethereum) {
-      throw new Error("Phantom not installed for Ethereum");
-    }
-
-    const provider = window.phantom?.ethereum;
-
-    try {
-      // Try to switch to the network
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: network.id }]
-      });
-    } catch (err) {
-      // If the error code is 4902, the network needs to be added
-      if (err.code === 4902) {
-        try {
-          await provider.request({
-            method: "wallet_addEthereumChain",
-            params: [{
-              chainId: network.id,
-              chainName: network.name,
-              rpcUrls: network.rpcUrls,
-              nativeCurrency: network.nativeCurrency,
-              blockExplorerUrls: network.blockExplorers
-            }]
-          });
-        } catch (addError) {
-          console.error("Error adding network:", addError);
-        }
-      } else {
-        console.error("Error switching network:", err);
-      }
-    }
-
-  }
+    await switchOrAddEvmChain(window.phantom?.ethereum, chainName);
+  };
 
   signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
     const isInstalled = await this.isInstalled();
