@@ -25,6 +25,7 @@ const SYMBOL_DECIMALS: Record<string, number> = {
   'USDT.arb': 6,
   'USDC.bsc': 6,
   'USDT.bnb': 6,
+  'DAI.sol': 6,
   pSOL: 9,
 };
 
