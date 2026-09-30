@@ -117,8 +117,13 @@ const getFailureStageForProgress = (
     return 'push';
   }
   if (event.id.startsWith('SEND-TX-3')) return 'source';
-  if (event.id.startsWith('SEND-TX-1')) return 'push';
   if (event.id.startsWith('SEND-TX-2')) return 'destination';
+  // Route 1 (101-199) is UOA -> Push Chain, and the whole 1xx body up to 199
+  // runs on the origin chain: 105-02 is "Gas funding confirmed on origin
+  // chain" and 106-04 is "Origin chain lock confirmed". Only 199 is the
+  // terminal Push Chain leg, so it is the sole 1xx id that reports 'push'.
+  if (event.id.startsWith('SEND-TX-199')) return 'push';
+  if (event.id.startsWith('SEND-TX-1')) return 'source';
   return 'unknown';
 };
 
