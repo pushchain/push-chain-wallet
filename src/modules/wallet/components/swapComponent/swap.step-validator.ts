@@ -113,9 +113,10 @@ const getMalformedStepReason = (step: unknown): string | null => {
     if (
       !isRecord(step.token) ||
       typeof step.token.chain !== 'string' ||
-      typeof step.token.address !== 'string'
+      typeof step.token.address !== 'string' ||
+      typeof step.token.symbol !== 'string'
     ) {
-      return 'The bridge token chain or address is missing.';
+      return 'The bridge token chain, address, or symbol is missing.';
     }
     return null;
   }

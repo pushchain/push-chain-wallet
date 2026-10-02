@@ -431,6 +431,25 @@ describe('RamenFi route invariant failures', () => {
       }),
     },
     {
+      description: 'a bridge token with no symbol',
+      code: 'INVALID_STEP',
+      params: validationParams({
+        steps: [
+          {
+            type: 'bridge',
+            amountRaw: '1000000',
+            token: {
+              chain: ETHEREUM,
+              address: ETHEREUM_USDC,
+              decimals: 6,
+              mechanism: 'approve',
+            },
+          } as unknown as SwapStep,
+          swap(),
+        ],
+      }),
+    },
+    {
       description: 'invalid swap calldata',
       code: 'INVALID_STEP',
       params: validationParams({
