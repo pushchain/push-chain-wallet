@@ -4,6 +4,7 @@ import { BaseWalletProvider } from "../BaseWalletProvider";
 import { bytesToHex, hexToBytes, parseTransaction } from "viem";
 import { BrowserProvider } from 'ethers';
 import { getAddress } from 'ethers';
+import { serializeTypedData } from "../utils/serializeTypedData";
 import { switchOrAddEvmChain } from "../utils/switchEvmChain";
 
 declare global {
@@ -196,7 +197,7 @@ export class MetamaskProvider extends BaseWalletProvider {
 
       const signature = await provider.request({
         method: 'eth_signTypedData_v4',
-        params: [accounts[0], JSON.stringify(typedData)],
+        params: [accounts[0], serializeTypedData(typedData)],
       });
 
       return hexToBytes(signature as `0x${string}`);

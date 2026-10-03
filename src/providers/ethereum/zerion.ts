@@ -8,6 +8,7 @@ import {
 import { ChainType, ITypedData } from "../../types/wallet.types";
 import { BaseWalletProvider } from "../BaseWalletProvider";
 import { getEIP6963ProviderByRdns } from "../utils/eip6963";
+import { serializeTypedData } from "../utils/serializeTypedData";
 import { switchOrAddEvmChain } from "../utils/switchEvmChain";
 
 export class ZerionProvider extends BaseWalletProvider {
@@ -164,7 +165,7 @@ export class ZerionProvider extends BaseWalletProvider {
 
     const signature = await provider.request({
       method: "eth_signTypedData_v4",
-      params: [accounts[0], JSON.stringify(typedData)],
+      params: [accounts[0], serializeTypedData(typedData)],
     });
 
     return hexToBytes(signature as `0x${string}`);
