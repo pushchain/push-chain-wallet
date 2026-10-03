@@ -1,6 +1,7 @@
 import { chains } from "../providers/ethereum/chains";
 import { ChainType, ITypedData } from "../types/wallet.types";
 import { bytesToHex, Chain, hexToBytes, isHash, parseTransaction, toHex } from "viem";
+import { serializeTypedData } from "../providers/utils/serializeTypedData";
 import { waitForTxHashFromPendingTxId } from "./waapEvents";
 
 export const getWaapProvider = () => {
@@ -112,7 +113,7 @@ export const waapSignTypedData = async (
 
 	const signature = await provider.request({
 		method: "eth_signTypedData_v4",
-		params: [accounts[0], JSON.stringify(typedData)],
+		params: [accounts[0], serializeTypedData(typedData)],
 	});
 
 	return hexToBytes(signature as `0x${string}`);
