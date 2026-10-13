@@ -11,6 +11,12 @@ import {
   SwapActivitiesSuccessResponse,
 } from './swap.activity-api.types';
 import { SwapFlowError } from './swap.errors';
+import { parseUnits } from 'viem';
+import {
+  PUSH_CHAIN_ID,
+  WPC_ADDRESS,
+  ZERO_ADDRESS,
+} from './swap.constants';
 
 const DEFAULT_SWAP_API_URL = 'https://www.ramenfi.xyz';
 const SWAP_API_MAX_ATTEMPTS = 3;
@@ -159,12 +165,54 @@ const post = async <T extends { success: boolean }>(
 export const fetchSwapQuote = (request: QuoteApiRequest) =>
   post<QuoteApiSuccessResponse>('/api/quote', request, 'quote');
 
-export const fetchSwapSteps = (request: SwapApiRequest) =>
-  post<SwapApiSuccessResponse>(
-    '/api/swap',
-    request,
-    'route-preparation',
-  );
+const isSameAddress = (first?: string, second?: string) =>
+  !!first && !!second && first.trim().toLowerCase() === second.trim().toLowerCase();
+
+const getNativePcWrapSteps = (
+  request: SwapApiRequest,
+): SwapApiSuccessResponse | null => {
+  const isPushWrap =
+    request.sourceChain === PUSH_CHAIN_ID &&
+    request.destinationChain === PUSH_CHAIN_ID &&
+    isSameAddress(request.fromToken, ZERO_ADDRESS) &&
+    isSameAddress(request.toToken, WPC_ADDRESS) &&
+    isSameAddress(request.userAddress, request.recipient);
+
+  if (!isPushWrap) return null;
+
+  let value: bigint;
+  try {
+    value = parseUnits(request.amountIn, 18);
+  } catch {
+    return null;
+  }
+  if (value <= 0n) return null;
+
+  return {
+    success: true,
+    steps: [
+      {
+        type: 'swap',
+        to: WPC_ADDRESS,
+        value: value.toString(),
+        // WPC uses the canonical WETH-style payable deposit() method.
+        data: '0xd0e30db0',
+      },
+    ],
+    message: 'Wrap PC into WPC',
+  };
+};
+
+export const fetchSwapSteps = (request: SwapApiRequest) => {
+  const nativeWrap = getNativePcWrapSteps(request);
+  return nativeWrap
+    ? Promise.resolve(nativeWrap)
+    : post<SwapApiSuccessResponse>(
+        '/api/swap',
+        request,
+        'route-preparation',
+      );
+};
 
 const getActivityErrorMessage = (
   data: SwapActivitiesResponse | null,

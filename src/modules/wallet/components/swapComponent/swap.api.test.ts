@@ -5,6 +5,7 @@ import {
   fetchSwapSteps,
 } from './swap.api';
 import { SwapFlowError } from './swap.errors';
+import { PUSH_CHAIN_ID, WPC_ADDRESS, ZERO_ADDRESS } from './swap.constants';
 
 const quoteRequest = {
   sourceChain: 'eip155:11155111',
@@ -116,6 +117,58 @@ describe('RamenFi swap API', () => {
         body: JSON.stringify(request),
       }),
     );
+  });
+
+  it('prepares a native PC to WPC wrap without requesting an AMM pool path', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const userAddress = '0x2222222222222222222222222222222222222222';
+
+    await expect(
+      fetchSwapSteps({
+        sourceChain: PUSH_CHAIN_ID,
+        destinationChain: PUSH_CHAIN_ID,
+        fromToken: ZERO_ADDRESS,
+        toToken: WPC_ADDRESS,
+        amountIn: '1',
+        userAddress,
+        recipient: userAddress,
+        poolResult: null,
+      }),
+    ).resolves.toEqual({
+      success: true,
+      steps: [
+        {
+          type: 'swap',
+          to: WPC_ADDRESS,
+          value: '1000000000000000000',
+          data: '0xd0e30db0',
+        },
+      ],
+      message: 'Wrap PC into WPC',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps using the API when PC is wrapped for a different recipient', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true, steps: [] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchSwapSteps({
+      sourceChain: PUSH_CHAIN_ID,
+      destinationChain: PUSH_CHAIN_ID,
+      fromToken: ZERO_ADDRESS,
+      toToken: WPC_ADDRESS,
+      amountIn: '1',
+      userAddress: '0x2222222222222222222222222222222222222222',
+      recipient: '0x3333333333333333333333333333333333333333',
+      poolResult: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it('retries a transient upstream RPC 429 before returning the quote', async () => {

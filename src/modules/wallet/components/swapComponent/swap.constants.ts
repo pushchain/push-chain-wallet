@@ -8,6 +8,9 @@ export const PUSH_CHAIN_ID =
 export const ZERO_ADDRESS =
   '0x0000000000000000000000000000000000000000' as const;
 
+export const WPC_ADDRESS =
+  '0xE17DD2E0509f99E9ee9469Cf6634048Ec5a3ADe9' as const;
+
 export const AUTO_SLIPPAGE_PERCENTAGE = '0.50';
 export const SWAP_TITLE = 'Swap';
 export const SWAP_DISPLAY_DECIMALS = 5;
@@ -39,7 +42,7 @@ export const PUSH_SWAP_TOKENS: SwapToken[] = [
   },
   {
     chain: PUSH_CHAIN_ID,
-    address: '0xE17DD2E0509f99E9ee9469Cf6634048Ec5a3ADe9',
+    address: WPC_ADDRESS,
     symbol: 'WPC',
     name: 'Wrapped PC',
     decimals: 18,
