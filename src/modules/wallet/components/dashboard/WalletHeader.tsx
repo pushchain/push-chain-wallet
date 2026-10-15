@@ -100,7 +100,7 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton, 
                 <Box cursor="pointer" display='flex' alignItems='center' height='100%'>
                     <Back
                         size={24}
-                        color="pw-int-icon-primary-color"
+                        color="pw-int-text-tertiary-color"
                         onClick={handleBackButton}
                     />
                 </Box>

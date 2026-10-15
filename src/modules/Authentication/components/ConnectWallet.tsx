@@ -111,7 +111,7 @@ const ConnectWallet: FC<WalletSelectionProps> = ({ setConnectMethod }) => {
   return (
     <Box flexDirection="column" display="flex" gap="spacing-lg" width="100%">
       <Box cursor="pointer" onClick={() => handleBack()}>
-        <Back color="pw-int-icon-tertiary-color" size={24} />
+        <Back color="pw-int-text-tertiary-color" size={24} />
       </Box>
       <Box flexDirection="column" display="flex" gap="spacing-md">
         <Box flexDirection="column" display="flex" gap="spacing-md">

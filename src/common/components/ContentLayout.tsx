@@ -3,6 +3,7 @@ import { Box } from "../../blocks";
 import { css } from "styled-components";
 import React from "react";
 import { getAppParamValue } from "../Common.utils";
+import { ThemeToggle } from "./ThemeToggle";
 
 
 type ContentLayoutProps = {
@@ -29,6 +30,8 @@ const ContentLayout: FC<ContentLayoutProps> = ({ children, footer }) => {
         margin: 0 0 auto 0;
       `}
     >
+      {/* Standalone only: inside the UI kit's iframe the host app owns the theme */}
+      {!isOpenedInIframe && <ThemeToggle />}
       {children}
       {footer}
     </Box>

@@ -44,6 +44,11 @@ export default function App() {
 
   const isOpenedInIframe = !!getAppParamValue();
 
+  // Keep <html theme> in step with the stored mode after a reload, not only when it is switched (index.css keys the connect modal on it).
+  useEffect(() => {
+    document.documentElement.setAttribute("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
+
   useEffect(() => {
     if ((isUIKitVersion('5') && !isUIKitVersion('6')) || !isOpenedInIframe) ensureWaapInit(isDarkMode, state.walletConfig);
   }, [isDarkMode, isOpenedInIframe, state.walletConfig]);

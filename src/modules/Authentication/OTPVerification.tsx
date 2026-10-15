@@ -137,7 +137,7 @@ export const OTPVerification: FC<OTPVerificationProps> = ({
           padding="spacing-lg"
         >
           <Box onClick={() => navigate(APP_ROUTES.AUTH)}>
-            <Back color='pw-int-icon-tertiary-color' size={24} />
+            <Back color='pw-int-text-tertiary-color' size={24} />
           </Box>
 
           <Box flexDirection="column" display="flex" gap="spacing-xxl">

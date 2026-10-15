@@ -219,7 +219,7 @@ const SwapDetails: FC = () => {
                 transform: rotate(-90deg);
               `}
             >
-              <Back size={24} color="pw-int-icon-tertiary-color" />
+              <Back size={24} color="pw-int-text-tertiary-color" />
             </Box>
           </Box>
           <TokenRouteRow

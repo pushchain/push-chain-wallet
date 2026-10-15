@@ -35,7 +35,7 @@ const AgenticHeader: FC<AgenticHeaderProps> = ({ address, variant, title, onBack
   return (
     <Row>
       <BackButton onClick={onBack} aria-label="Back">
-        <Back size={24} style={{ color: 'var(--aw-icon-tertiary)' }} />
+        <Back size={24} color="pw-int-text-tertiary-color" />
       </BackButton>
 
       <Identity>
