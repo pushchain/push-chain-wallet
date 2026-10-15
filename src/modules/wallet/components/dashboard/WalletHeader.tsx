@@ -41,9 +41,11 @@ import { getAddressExplorerUrl } from "../../../../utils/explorer";
 type WalletHeaderProps = {
     walletAddress: string;
     handleBackButton?: () => void;
+    /* Centred title in place of the account row, as the Receive screen shows */
+    title?: string;
 };
 
-const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }) => {
+const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton, title }) => {
     const { state, dispatch } = useGlobalState();
     const { activeState, setActiveState } = useWalletDashboard();
 
@@ -104,16 +106,16 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton }
                 </Box>
             )}
 
-            {activeState === 'receive' && (
+            {(activeState === 'receive' || title) && (
                 <Box
                     textAlign='center'
                     css={css`flex:1`}
                 >
-                    <Text variant="h3-semibold">Receive Address</Text>
+                    <Text variant="h3-semibold">{title ?? 'Receive Address'}</Text>
                 </Box>
             )}
 
-            {activeState !== 'receive' && <Box display="flex" gap="spacing-xs">
+            {activeState !== 'receive' && !title && <Box display="flex" gap="spacing-xs">
                 <Box
                     position="relative"
                     display="flex"

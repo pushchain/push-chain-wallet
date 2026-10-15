@@ -6,11 +6,20 @@ import { useWalletDashboard } from '../../../context/WalletDashboardContext';
 import { QRCodeSVG } from 'qrcode.react';
 import { usePushChain } from '../../../context/PushChainContext';
 
-const Receive = () => {
+type ReceiveProps = {
+    /* Address to receive on; defaults to the connected Push account. Agentic wallets pass their own. */
+    address?: string;
+    /* Where back/close lead; defaults to the wallet dashboard. */
+    onBack?: () => void;
+};
+
+const Receive = ({ address, onBack }: ReceiveProps = {}) => {
     const { setActiveState } = useWalletDashboard();
     const [isCopied, setIsCopied] = useState(false);
 
-    const { executorAddress } = usePushChain();
+    const { executorAddress: connectedAddress } = usePushChain();
+    const executorAddress = address ?? connectedAddress;
+    const close = onBack ?? (() => setActiveState('walletDashboard'));
 
     const handleCopyAddress = () => {
         if (executorAddress) {
@@ -41,7 +50,7 @@ const Receive = () => {
             gap="spacing-md"
             position="relative"
         >
-            <WalletHeader walletAddress={executorAddress} handleBackButton={() => setActiveState('walletDashboard')} />
+            <WalletHeader walletAddress={executorAddress} handleBackButton={close} title={address ? 'Receive Address' : undefined} />
 
             <Box
                 display='flex'
@@ -117,7 +126,7 @@ const Receive = () => {
                         width='100%'
                     >
 
-                        <Button block onClick={() => setActiveState('walletDashboard')}>Close</Button>
+                        <Button block onClick={close}>Close</Button>
                     </Box>
                 </Box>
 

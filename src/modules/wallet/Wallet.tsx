@@ -41,6 +41,8 @@ import {
 } from "../../analytics/walletEvents";
 import { Swap } from "./components/swapComponent/Swap";
 import { SwapDetails } from "./components/swapComponent/SwapDetails";
+import { AgenticWallets } from "./components/agenticWallet/AgenticWallets";
+import { AgenticWalletProvider } from "./components/agenticWallet/AgenticWalletContext";
 
 export type WalletProps = Record<string, never>;
 
@@ -362,27 +364,30 @@ const Wallet: FC<WalletProps> = () => {
             setActiveDashboardTab={setActiveDashboardTab}
           >
             <SwapTransactionProvider>
-              {activeState === 'walletDashboard' && <WalletDashboard />}
-              {activeState === 'addTokens' && <AddTokens />}
-              {activeState === 'receive' && <Receive />}
-              {activeState === 'send' && <Send initialTokenDetails={sendTokenSelection} />}
-              {activeState === 'swap' && <Swap />}
-              {activeState === 'swapDetails' && <SwapDetails />}
-              {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
-              <Reconnect />
-              {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (
-                <UpgradeDrawer
-                  currentVersion={state.upgradeInfo.currentVersion}
-                  newVersion={state.upgradeInfo.newVersion}
-                  onUpgrade={async () => {
-                    await pushChainClient.upgradeAccount();
-                    dispatch({ type: "HIDE_UPGRADE_DRAWER" });
-                  }}
-                  onCancel={() => {
-                    dispatch({ type: "HIDE_UPGRADE_DRAWER" });
-                  }}
-                />
-              )}
+              <AgenticWalletProvider>
+                {activeState === 'walletDashboard' && <WalletDashboard />}
+                {activeState === 'addTokens' && <AddTokens />}
+                {activeState === 'receive' && <Receive />}
+                {activeState === 'send' && <Send initialTokenDetails={sendTokenSelection} />}
+                {activeState === 'swap' && <Swap />}
+                {activeState === 'swapDetails' && <SwapDetails />}
+                {activeState === 'recoveryPhrase' && <WalletRecoveryPhrase />}
+                {activeState === 'agenticWallets' && <AgenticWallets />}
+                <Reconnect />
+                {state.showUpgradeDrawer && state.upgradeInfo && pushChainClient && (
+                  <UpgradeDrawer
+                    currentVersion={state.upgradeInfo.currentVersion}
+                    newVersion={state.upgradeInfo.newVersion}
+                    onUpgrade={async () => {
+                      await pushChainClient.upgradeAccount();
+                      dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                    }}
+                    onCancel={() => {
+                      dispatch({ type: "HIDE_UPGRADE_DRAWER" });
+                    }}
+                  />
+                )}
+              </AgenticWalletProvider>
             </SwapTransactionProvider>
           </WalletDashboardProvider>
         </Box>

@@ -3,6 +3,8 @@ export * from "./Icons.types";
 
 export { default as Add } from "./components/Add";
 
+export { default as AgenticWallet } from "./components/AgenticWallet";
+
 export { default as AddEmoji } from "./components/AddEmoji";
 export { default as Apple } from "./components/Apple";
 
@@ -134,6 +136,8 @@ export { default as OptimismMonotone } from "./components/OptimismMonotone";
 
 export { default as Pencil } from "./components/Pencil";
 
+export { default as PinToTop } from "./components/PinToTop";
+
 export { default as PlusCircle } from "./components/PlusCircle";
 export { default as PlusCircleFilled } from "./components/PlusCircleFilled";
 
@@ -161,6 +165,10 @@ export { default as ReceiveNotificationFilled } from "./components/ReceiveNotifi
 export { default as Refresh } from "./components/Refresh";
 
 export { default as Sale } from "./components/Sale";
+
+export { default as Sort } from "./components/Sort";
+
+export { default as Sparkle } from "./components/Sparkle";
 
 export { default as SealCheck } from "./components/SealCheck";
 export { default as SealCheckFilled } from "./components/SealCheckFilled";

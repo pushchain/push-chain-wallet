@@ -7,6 +7,7 @@ export type ActiveStates =
     | 'swapDetails'
     | 'addTokens'
     | 'recoveryPhrase'
+    | 'agenticWallets'
 
 export type WalletDashboardTab = 'tokens' | 'activity' | 'subAccounts';
 export type PushNetworks = 'Push Testnet Donut' | 'Push Testnet Sushi';

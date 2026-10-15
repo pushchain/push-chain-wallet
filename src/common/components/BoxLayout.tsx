@@ -30,6 +30,9 @@ const BoxLayout: FC<BoxLayoutProps> = ({ children }) => {
       css={css`
         padding: var(--pw-int-modal-border);
         overflow: hidden;
+        /* clip, not just hide: the oversized rotating ::before made this box scrollable, so
+           focusing or scrolling to an input could shift the whole card up */
+        overflow: clip;
         border-radius: var(--pw-int-modal-border-radius);
         display: flex;
         flex-direction: column;

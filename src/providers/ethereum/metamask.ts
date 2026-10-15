@@ -51,20 +51,30 @@ export class MetamaskProvider extends BaseWalletProvider {
     return this.sdk.getProvider();
   };
 
-  getSigner = async () => {
-    const sdkProvider = this.sdk.getProvider();
-    if (!sdkProvider) {
+  /*
+   * The SDK only has a provider once it has initialised. A session restored after a page
+   * reload never calls connect(), so finish initialising before the first request.
+   */
+  private readyProvider = async () => {
+    let provider = this.sdk.getProvider();
+    if (!provider) {
+      await this.sdk.init();
+      provider = this.sdk.getProvider();
+    }
+    if (!provider) {
       throw new Error('Provider is undefined');
     }
+    return provider;
+  };
+
+  getSigner = async () => {
+    const sdkProvider = await this.readyProvider();
     const browserProvider = new BrowserProvider(sdkProvider);
     return await browserProvider.getSigner();
   };
 
   getChainId = async (): Promise<number> => {
-    const provider = this.getProvider();
-    if (!provider) {
-      throw new Error('Provider is undefined');
-    }
+    const provider = await this.readyProvider();
     const hexChainId = await provider.request({
       method: 'eth_chainId',
       params: [],
@@ -100,10 +110,7 @@ export class MetamaskProvider extends BaseWalletProvider {
 
   signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
     try {
-      const provider = this.getProvider();
-      if (!provider) {
-        throw new Error('Provider is undefined');
-      }
+      const provider = await this.readyProvider();
       const accounts = (await provider.request({
         method: 'eth_accounts',
       })) as string[];
@@ -128,10 +135,7 @@ export class MetamaskProvider extends BaseWalletProvider {
 
   signAndSendTransaction = async (txn: Uint8Array): Promise<Uint8Array> => {
     try {
-      const provider = this.getProvider();
-      if (!provider) {
-        throw new Error('Provider is undefined');
-      }
+      const provider = await this.readyProvider();
       const accounts = (await provider.request({
         method: 'eth_accounts',
       })) as string[];
@@ -171,10 +175,7 @@ export class MetamaskProvider extends BaseWalletProvider {
 
   signTypedData = async (typedData: ITypedData): Promise<Uint8Array> => {
     try {
-      const provider = this.getProvider();
-      if (!provider) {
-        throw new Error('Provider is undefined');
-      }
+      const provider = await this.readyProvider();
       const accounts = (await provider.request({
         method: 'eth_accounts',
       })) as string[];
@@ -208,10 +209,7 @@ export class MetamaskProvider extends BaseWalletProvider {
 
 
   disconnect = async () => {
-    const provider = this.getProvider();
-    if (!provider) {
-      throw new Error('Provider is undefined');
-    }
+    const provider = await this.readyProvider();
     await provider.request({
       method: 'wallet_revokePermissions',
       params: [
