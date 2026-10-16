@@ -125,8 +125,11 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
 
   const allowedCalls: AllowedCall[] = rule.apps.flatMap((ruleApp) => {
     const target = appTarget(ruleApp, network);
+    const catalogFunctions = getApp(ruleApp.appId)?.functions ?? [];
     return appSignatures(ruleApp).map((selector) => {
-      const pins = ruleApp.pins?.[selectorKey(selector) ?? ''];
+      // Pins read from a granted rule win; otherwise a catalog function brings the SDK catalog's pins.
+      const pins =
+        ruleApp.pins?.[selectorKey(selector) ?? ''] ?? catalogFunctions.find((fn) => fn.signature === selector)?.pins;
       return { target, selector: selector as AllowedCall['selector'], ...(pins?.length ? { pins } : {}) };
     });
   });
@@ -241,7 +244,9 @@ export const fromPresetTemplate = (
   if (!network) return null;
 
   template.allowedCalls.forEach((call) => {
-    if (call.app && !registry.getApp(network.id, call.target)) {
+    // Contracts the catalog already knows (from the SDK) are not saved again as custom apps.
+    const inCatalog = AGENTIC_APPS.some((a) => a.contracts?.[network.id]?.toLowerCase() === call.target.toLowerCase());
+    if (call.app && !inCatalog && !registry.getApp(network.id, call.target)) {
       registry.saveApp(network.id, { address: getAddress(call.target), name: call.app });
     }
     if (call.selector.includes('(')) registry.saveFunctions(network.id, call.target, [call.selector]);

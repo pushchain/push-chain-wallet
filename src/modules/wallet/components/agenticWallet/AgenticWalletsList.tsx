@@ -20,6 +20,7 @@ import { AgenticSortOption, AgenticWallet } from './agenticWallet.types';
 import { maskAddress, sortWallets } from './agenticWallet.utils';
 import { AgenticHeader } from './components/AgenticHeader';
 import { AgenticMenu } from './components/AgenticMenu';
+import { RenameWalletSheet } from './components/CustomSheets';
 import { useAgenticWallets } from './AgenticWalletContext';
 
 type AgenticWalletsListProps = {
@@ -46,7 +47,8 @@ const AgenticWalletsList: FC<AgenticWalletsListProps> = ({
   onFundWallet,
   onEditRules,
 }) => {
-  const { wallets, togglePin, loading, error, available, refresh } = useAgenticWallets();
+  const { wallets, togglePin, renameWallet, loading, error, available, refresh } = useAgenticWallets();
+  const [renaming, setRenaming] = useState<AgenticWallet | null>(null);
   const [sort, setSort] = useState<AgenticSortOption>('recent');
   const sortedWallets = useMemo(() => sortWallets(wallets, sort), [wallets, sort]);
 
@@ -186,16 +188,26 @@ const AgenticWalletsList: FC<AgenticWalletsListProps> = ({
                 onFund={() => onFundWallet(wallet.address)}
                 onEditRules={() => onEditRules(wallet.address)}
                 onTogglePin={() => togglePin(wallet.address)}
+                onRename={() => setRenaming(wallet)}
               />
             ))}
           </WalletList>
         </ListSection>
 
-        <PrimaryButton type="button" onClick={onCreate}>
+        {/* Figma (Wallet Dropdown / Rename Wallet frames): secondary "Add agentic wallet" */}
+        <SecondaryButton type="button" onClick={onCreate}>
           <Add size={16} />
-          New wallet
-        </PrimaryButton>
+          Add agentic wallet
+        </SecondaryButton>
       </Body>
+
+      {renaming && (
+        <RenameWalletSheet
+          currentName={renaming.name}
+          onClose={() => setRenaming(null)}
+          onRename={(name) => renameWallet(renaming, name)}
+        />
+      )}
     </Screen>
   );
 };
@@ -222,9 +234,10 @@ type WalletCardProps = {
   onFund: () => void;
   onEditRules: () => void;
   onTogglePin: () => void;
+  onRename: () => void;
 };
 
-const WalletCard: FC<WalletCardProps> = ({ wallet, onOpen, onFund, onEditRules, onTogglePin }) => {
+const WalletCard: FC<WalletCardProps> = ({ wallet, onOpen, onFund, onEditRules, onTogglePin, onRename }) => {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -275,6 +288,7 @@ const WalletCard: FC<WalletCardProps> = ({ wallet, onOpen, onFund, onEditRules, 
                   onSelect: onFund,
                 },
                 { key: 'edit', label: 'Edit Rules & Limits', icon: <Pencil size={24} />, onSelect: onEditRules },
+                { key: 'rename', label: 'Rename Wallet', icon: <AgenticWalletIcon size={24} />, onSelect: onRename },
                 {
                   key: 'pin',
                   label: wallet.pinned ? 'Unpin' : 'Pin to top',

@@ -1,4 +1,7 @@
 import { PushChain } from '@pushchain/core';
+import type { ForeignChainNamespace } from '@pushchain/core';
+import { getAddress } from 'viem';
+import { formatFunctionSignature } from './agenticWallet.functions';
 import { AgenticApp, AgenticNetwork } from './agenticWallet.types';
 
 const CHAIN = PushChain.CONSTANTS.CHAIN;
@@ -52,7 +55,8 @@ export const AGENTIC_NETWORKS: AgenticNetwork[] = [
  */
 const EVM_NETWORKS = ['ethereum', 'base', 'arbitrum', 'bnb'];
 
-export const AGENTIC_APPS: AgenticApp[] = [
+/* Placeholder catalog (names and labels only) until the real app and function list arrives. */
+const PLACEHOLDER_APPS: AgenticApp[] = [
   {
     id: 'uniswap',
     name: 'Uniswap',
@@ -153,6 +157,81 @@ export const AGENTIC_APPS: AgenticApp[] = [
     ],
   },
 ];
+
+/* SDK preset app names that are the same app as a placeholder entry */
+const SDK_APP_ALIASES: Record<string, string> = {
+  'Uniswap V3': 'uniswap',
+  'PancakeSwap V3': 'pancakeswap',
+  'Aave V3': 'aave',
+};
+
+const appId = (name: string) =>
+  SDK_APP_ALIASES[name] ??
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+/*
+ * Fills contracts and functions from the SDK's reviewed preset catalog
+ * (PushChain.utils.agentic.presets) for the networks this wallet supports: Uniswap,
+ * PancakeSwap and Aave get their testnet contracts, and SDK-only apps (EigenLayer,
+ * Moonwell, Venus) are added. Functions come with their signature, label and pins. Apps
+ * the SDK does not cover keep their placeholder entry with no contract.
+ */
+const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
+  const byId = new Map(apps.map((app) => [app.id, { ...app, networks: [...app.networks], contracts: { ...app.contracts } }]));
+  const fromSdk = new Set<string>();
+  let presets: typeof PushChain.utils.agentic.presets;
+  try {
+    presets = PushChain.utils.agentic.presets;
+  } catch {
+    return apps;
+  }
+
+  presets.list().presets.forEach((preset) => {
+    AGENTIC_NETWORKS.filter((network) => preset.chains.some((chain) => chain === network.chain)).forEach((network) => {
+      let rules;
+      try {
+        rules = presets.get(preset.constant, { chainNamespace: network.chain as ForeignChainNamespace }).rules;
+      } catch {
+        return;
+      }
+      rules
+        .flatMap((rule) => rule.allowedCalls)
+        .forEach((call) => {
+          if (!call.app || !call.selector.includes('(')) return;
+          const id = appId(call.app);
+          let app = byId.get(id);
+          if (!app) {
+            app = { id, name: call.app, networks: [], contracts: {}, functions: [] };
+            byId.set(id, app);
+          }
+          // One contract per app and network; a second target under the same name is left out.
+          const existing = app.contracts[network.id];
+          if (existing && existing.toLowerCase() !== call.target.toLowerCase()) return;
+          app.contracts[network.id] = getAddress(call.target);
+          if (!app.networks.includes(network.id)) app.networks.push(network.id);
+          // The SDK's functions replace the placeholder ones, which have no signatures.
+          if (!fromSdk.has(id)) {
+            app.functions = [];
+            fromSdk.add(id);
+          }
+          if (!app.functions.some((fn) => fn.id === call.selector)) {
+            app.functions.push({
+              id: call.selector,
+              label: call.label ?? formatFunctionSignature(call.selector),
+              signature: call.selector,
+              ...(call.pins?.length ? { pins: call.pins } : {}),
+            });
+          }
+        });
+    });
+  });
+  return [...byId.values()];
+};
+
+export const AGENTIC_APPS: AgenticApp[] = withSdkCatalog(PLACEHOLDER_APPS);
 
 export const WALLET_NAME_MAX_LENGTH = 30;
 

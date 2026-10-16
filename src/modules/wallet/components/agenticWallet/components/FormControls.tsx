@@ -1,7 +1,8 @@
-import { FC, ReactElement, ReactNode } from 'react';
+import { FC, ReactElement, ReactNode, useState } from 'react';
 import styled, { css } from 'styled-components';
 import * as RadixDropdown from '@radix-ui/react-dropdown-menu';
-import { Add, CaretDown, CaretUp, Cross, Dropdown, DropdownProps, KebabMenuVertical, Pencil } from 'blocks';
+import { Add, CaretDown, CaretUp, CopyFilled, Cross, Dropdown, DropdownProps, KebabMenuVertical, Pencil, TickCircleFilled } from 'blocks';
+import { handleCopy } from 'common';
 import { AText, agenticTokens } from '../AgenticWallet.styles';
 import { AgenticMenu, AgenticMenuItem } from './AgenticMenu';
 
@@ -330,6 +331,9 @@ export type SelectOption = {
   value: string;
   label: string;
   icon?: ReactNode;
+  /* Contract under the app name, e.g. "0x9cf...4ebdc"; copyValue is the full address the copy icon copies */
+  description?: string;
+  copyValue?: string;
 };
 
 /* First row of a picker that opens a "custom" flow, e.g. "Add Custom Contract". */
@@ -395,7 +399,17 @@ export const SelectField: FC<SelectFieldProps> = ({
               }}
             >
               {option.icon}
-              <OptionLabel>{option.label}</OptionLabel>
+              {option.description ? (
+                <OptionText>
+                  <OptionLabel>{option.label}</OptionLabel>
+                  <OptionMeta>
+                    <span>{option.description}</span>
+                    {option.copyValue && <OptionCopy value={option.copyValue} />}
+                  </OptionMeta>
+                </OptionText>
+              ) : (
+                <OptionLabel>{option.label}</OptionLabel>
+              )}
             </OptionItem>
           ))}
         </OptionsList>
@@ -562,6 +576,68 @@ const OptionItem = styled(RadixDropdown.Item)<{ $selected?: boolean }>`
   &:hover,
   &[data-highlighted] {
     background: var(--pw-int-bg-tertiary-color);
+  }
+
+  &:hover .option-copy,
+  &[data-highlighted] .option-copy {
+    visibility: visible;
+  }
+`;
+
+/*
+ * Copies an option's contract without choosing the option. Figma shows it on the
+ * highlighted row only.
+ */
+const OptionCopy: FC<{ value: string }> = ({ value }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <CopyButton
+      role="button"
+      aria-label="Copy contract address"
+      className="option-copy"
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCopy(value, setCopied);
+      }}
+    >
+      {copied ? <TickCircleFilled size={12} color="pw-int-icon-success-bold-color" /> : <CopyFilled size={12} />}
+    </CopyButton>
+  );
+};
+
+const OptionText = styled.span`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+`;
+
+/* Figma: Body Extra Small/Semibold, text/secondary */
+const OptionMeta = styled.span`
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxxs);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--pw-int-text-secondary-color);
+`;
+
+const CopyButton = styled.span`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: var(--pw-int-icon-tertiary-color);
+  visibility: hidden;
+
+  &:hover {
+    color: var(--pw-int-icon-brand-color);
   }
 `;
 

@@ -110,8 +110,10 @@ const TitleBlock = styled.div`
   padding: 0 var(--spacing-xs);
 `;
 
+/* Keeps line breaks in the copy, e.g. the two-line delete confirmation */
 const Subtitle = styled.div`
   padding: 0 var(--spacing-md);
+  white-space: pre-line;
 `;
 
 /* Form area and primary action, 48px apart as in the design. */

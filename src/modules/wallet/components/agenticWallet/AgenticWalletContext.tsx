@@ -21,6 +21,8 @@ type AgenticWalletContextType = {
   createWallet: (name: string, rules: AgenticRule[]) => Promise<AgenticAddress>;
   applyRuleChanges: (wallet: AgenticWallet, next: AgenticRule[]) => Promise<void>;
   revokeRule: (wallet: AgenticWallet, rulesId: AgenticHex) => Promise<void>;
+  /* On-chain label (setLabel), owner only */
+  renameWallet: (wallet: AgenticWallet, name: string) => Promise<void>;
   togglePin: (address: string) => void;
 };
 
@@ -137,6 +139,15 @@ export const AgenticWalletProvider: FC<{ children: ReactNode }> = ({ children })
     [agentic, reloadOne],
   );
 
+  const renameWallet = useCallback(
+    async (wallet: AgenticWallet, name: string) => {
+      if (!agentic) throw new Error('Push Chain client is not ready yet.');
+      await agentic.wallet(wallet.address).setLabel(name.trim());
+      await reloadOne(wallet);
+    },
+    [agentic, reloadOne],
+  );
+
   const wallets = useMemo(
     () =>
       loaded.map((wallet) => {
@@ -156,9 +167,10 @@ export const AgenticWalletProvider: FC<{ children: ReactNode }> = ({ children })
       createWallet,
       applyRuleChanges,
       revokeRule,
+      renameWallet,
       togglePin: registry.togglePin,
     }),
-    [wallets, loading, error, agentic, refresh, createWallet, applyRuleChanges, revokeRule],
+    [wallets, loading, error, agentic, refresh, createWallet, applyRuleChanges, revokeRule, renameWallet],
   );
 
   return <AgenticWalletContext.Provider value={value}>{children}</AgenticWalletContext.Provider>;

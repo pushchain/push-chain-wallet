@@ -7,6 +7,8 @@ import { getWalletlist } from '../modules/wallet/Wallet.utils';
 import { createGuardedPushChain, checkAndShowUpgradeIfNeeded } from '../helpers/txnAuthGuard';
 import { useEventEmitterContext } from './EventEmitterContext';
 import { getAppParamValue } from '../common';
+import type { ProgressEvent } from "@pushchain/core/src/lib/progress-hook/progress-hook.types";
+import { progressStore } from "../common/progress/progressStore";
 
 type PushChainContextType = {
     pushChainClient: PushChain | null;
@@ -92,8 +94,10 @@ export const PushChainProvider: React.FC<PushChainProviderProps> = ({ children }
 
             const initializeProps = {
                 network: PUSH_NETWORK.TESTNET_DONUT,
-                progressHook: async (progress: any) => {
+                progressHook: async (progress: ProgressEvent) => {
                     console.log("Progress hook", progress);
+                    // Shown as the bottom-right progress toast (ProgressToast)
+                    progressStore.set({ event: progress, originChain: universalSigner.account.chain });
                 },
             };
 

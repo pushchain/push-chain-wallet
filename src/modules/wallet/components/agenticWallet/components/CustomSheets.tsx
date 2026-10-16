@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { getAddress } from 'viem';
 import { Add, Download } from 'blocks';
-import { AText, ErrorText, PrimaryButton, SecondaryButton } from '../AgenticWallet.styles';
+import { AText, ErrorText, OutlineButton, PrimaryButton, SecondaryButton } from '../AgenticWallet.styles';
 import { fetchContractInfo, fetchTokenInfo } from '../agenticWallet.explorer';
 import {
   formatFunctionSignature,
@@ -10,6 +10,8 @@ import {
   parseFunctionSignature,
   writableFunctionsFromAbi,
 } from '../agenticWallet.functions';
+import { WALLET_NAME_MAX_LENGTH } from '../agenticWallet.constants';
+import { describeAgenticError } from '../agenticWallet.sdk';
 import { AgenticNetwork, CustomToken } from '../agenticWallet.types';
 import { isEvmAddress } from '../agenticWallet.utils';
 import { BottomSheet, SheetBody } from './BottomSheet';
@@ -272,6 +274,131 @@ export const CustomTokenSheet: FC<CustomTokenSheetProps> = ({ network, onClose, 
     </BottomSheet>
   );
 };
+
+type RenameWalletSheetProps = {
+  currentName: string;
+  onClose: () => void;
+  /* Writes the new label on chain; the sheet shows progress and any error */
+  onRename: (name: string) => Promise<void>;
+};
+
+/* Figma "Agentic Wallet Dashboard (Rename Wallet)" */
+export const RenameWalletSheet: FC<RenameWalletSheetProps> = ({ currentName, onClose, onRename }) => {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const trimmed = name.trim();
+  const valid = !!trimmed && trimmed !== currentName;
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onRename(trimmed);
+      onClose();
+    } catch (err) {
+      setError(describeAgenticError(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <BottomSheet title="Rename Wallet" subtitle="Rename your agentic wallet" onClose={busy ? () => undefined : onClose}>
+      <SheetBody>
+        <FieldsColumn $compact>
+          <Field label="Wallet Name" counter={`${name.length} / ${WALLET_NAME_MAX_LENGTH}`}>
+            <TextField
+              value={name}
+              placeholder={currentName || 'My Agent Wallet'}
+              maxLength={WALLET_NAME_MAX_LENGTH}
+              ariaLabel="Wallet Name"
+              onChange={(value) => {
+                setName(value);
+                setError(null);
+              }}
+            />
+          </Field>
+        </FieldsColumn>
+        <SubmitColumn>
+          {error && <ErrorText>{error}</ErrorText>}
+          <PrimaryButton type="button" disabled={!valid || busy} onClick={submit}>
+            {busy ? 'Renaming… confirm in your wallet' : 'Rename Wallet'}
+          </PrimaryButton>
+        </SubmitColumn>
+      </SheetBody>
+    </BottomSheet>
+  );
+};
+
+type DeleteRuleSheetProps = {
+  ruleNumber: number;
+  onClose: () => void;
+  /* Revokes on chain; the sheet shows progress and any error */
+  onDelete: () => Promise<void>;
+};
+
+/* Figma "Delete Rule Confirmation" */
+export const DeleteRuleSheet: FC<DeleteRuleSheetProps> = ({ ruleNumber, onClose, onDelete }) => {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onDelete();
+      onClose();
+    } catch (err) {
+      setError(describeAgenticError(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <BottomSheet
+      title={`Delete Rule ${ruleNumber}`}
+      subtitle={`Are you sure you want to delete Rule ${ruleNumber}.\nThis action will delete the rule.`}
+      onClose={busy ? () => undefined : onClose}
+    >
+      <ConfirmBody>
+        {error && <ErrorText>{error}</ErrorText>}
+        <ButtonRow>
+          <OutlineButton type="button" disabled={busy} onClick={onClose}>
+            Cancel
+          </OutlineButton>
+          <PrimaryButton type="button" disabled={busy} onClick={confirm}>
+            {busy ? 'Deleting…' : 'Delete Rule'}
+          </PrimaryButton>
+        </ButtonRow>
+      </ConfirmBody>
+    </BottomSheet>
+  );
+};
+
+/* The design leaves ~43px under the text before the buttons (24px sheet gap + 19px here). */
+const ConfirmBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding-top: 19px;
+`;
+
+/* Cancel and Delete Rule split the row equally, as in the design */
+const ButtonRow = styled.div`
+  display: flex;
+  gap: var(--spacing-xs);
+
+  > button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+`;
+
+const SubmitColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+`;
 
 /* The design's single-field frame is 82px, letting the hint run into the 48px gap above the button. */
 const FieldsColumn = styled.div<{ $compact: boolean }>`

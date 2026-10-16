@@ -13,9 +13,12 @@ import {
   isRuleStepTwoValid,
 } from './agenticWallet.utils';
 import { getAgenticPresets } from './agenticWallet.rules';
+import { getApp } from './agenticWallet.utils';
 
 const AGENT = getAddress('0x9cfa1c55e8b23fb4c2a3e2d55d0b1c7b0ae4ebdc');
-const ROUTER = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E';
+// A contract outside the catalog, used as a custom app
+const ROUTER = getAddress('0x1111111111111111111111111111111111111111');
+const UNISWAP_SEPOLIA = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E';
 
 const usdc = () => getNetworkTokens('ethereum').find((t) => t.symbol === 'USDC')!;
 
@@ -170,6 +173,43 @@ describe('call-only rules', () => {
     };
     expect(fromRulesRecord(record)!.tokens).toEqual([]);
     expect(isRuleStepTwoValid(draft({ tokens: [] }))).toBe(true);
+  });
+});
+
+describe('app catalog from the SDK', () => {
+  it('gives Uniswap, PancakeSwap and Aave their testnet contracts and keeps uncovered apps', () => {
+    expect(getApp('uniswap')?.contracts?.ethereum).toBe(UNISWAP_SEPOLIA);
+    expect(getApp('pancakeswap')?.contracts?.bnb).toBeDefined();
+    expect(getApp('aave')?.contracts?.ethereum).toBeDefined();
+    expect(getApp('eigenlayer')?.contracts?.ethereum).toBeDefined();
+    // Not in the SDK catalog: still listed, no contract.
+    expect(getApp('curve')).toBeDefined();
+    expect(getApp('curve')?.contracts?.ethereum).toBeUndefined();
+  });
+
+  it('sends catalog functions with their signature and the SDK pins', () => {
+    const aave = getApp('aave')!;
+    const supply = aave.functions.find((fn) => fn.label === 'Supply')!;
+    const rule = toSdkRule(draft({ apps: [{ appId: 'aave', functionIds: [supply.id] }] }));
+    expect(rule.allowedCalls[0]).toMatchObject({
+      target: aave.contracts!.ethereum,
+      selector: 'supply(address,uint256,address,uint16)',
+      pins: [{ arg: 2, expected: 'agentic:wallet' }],
+    });
+  });
+
+  it('reads a granted call to a catalog contract back as that app', () => {
+    const sdkRule = toSdkRule(draft());
+    const record: RulesRecord = {
+      rulesId: '0xabc',
+      enabled: true,
+      chainNamespace: sdkRule.chainNamespace!,
+      agent: sdkRule.agent,
+      validUntil: sdkRule.validUntil,
+      rule: { ...sdkRule, allowedCalls: [{ target: UNISWAP_SEPOLIA, selector: '0x04e45aaf', maxValue: 0n }] },
+      spent: { kind: 'universal', assets: [] },
+    };
+    expect(fromRulesRecord(record)!.apps[0]).toMatchObject({ appId: 'uniswap' });
   });
 });
 

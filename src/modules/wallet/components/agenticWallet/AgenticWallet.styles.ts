@@ -238,6 +238,34 @@ export const PrimaryButton = styled.button<{ $height?: number }>`
   }
 `;
 
+/* Figma "Outline" medium button: transparent, stroke/tertiary 1px, text/primary */
+export const OutlineButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--pw-int-border-tertiary-color);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--pw-int-text-primary-color);
+  font-family: var(--pw-int-font-family);
+  font-size: 16px;
+  line-height: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    border-color: var(--pw-int-brand-primary-subtle-color, var(--pw-int-border-tertiary-color));
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+`;
+
 export const SecondaryButton = styled.button<{ size?: 'xs' | 'sm' | 'md' }>`
   display: flex;
   align-items: center;

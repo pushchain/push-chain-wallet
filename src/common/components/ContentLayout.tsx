@@ -4,6 +4,7 @@ import { css } from "styled-components";
 import React from "react";
 import { getAppParamValue } from "../Common.utils";
 import { ThemeToggle } from "./ThemeToggle";
+import { ProgressToast } from "./ProgressToast";
 
 
 type ContentLayoutProps = {
@@ -32,6 +33,8 @@ const ContentLayout: FC<ContentLayoutProps> = ({ children, footer }) => {
     >
       {/* Standalone only: inside the UI kit's iframe the host app owns the theme */}
       {!isOpenedInIframe && <ThemeToggle />}
+      {/* In the UI kit's iframe the host app shows its own progress toast */}
+      {!isOpenedInIframe && <ProgressToast />}
       {children}
       {footer}
     </Box>

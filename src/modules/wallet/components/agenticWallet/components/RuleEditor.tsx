@@ -1,5 +1,6 @@
 import { FC, ReactNode, useState } from 'react';
 import styled from 'styled-components';
+import { getAddress } from 'viem';
 import { Add, OptOut } from 'blocks';
 import { CHAIN_LOGO, TOKEN_LOGO } from 'common';
 import { usePushChain } from '../../../../../context/PushChainContext';
@@ -243,8 +244,12 @@ const CUSTOM_APP_PREFIX = 'custom:';
 const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => void }> = ({ rule, onChange }) => {
   const network = getNetwork(rule.networkId);
   const registrySnapshot = useAgenticRegistry();
-  const customApps = registrySnapshot.apps[rule.networkId] ?? [];
   const catalogApps = getAppsForNetwork(rule.networkId);
+  // A saved custom contract that the catalog now covers (e.g. from the SDK) shows once, as the catalog app.
+  const customApps = (registrySnapshot.apps[rule.networkId] ?? []).filter(
+    (custom) =>
+      !catalogApps.some((a) => a.contracts?.[rule.networkId]?.toLowerCase() === custom.address.toLowerCase()),
+  );
   const [sheet, setSheet] = useState<SheetState | null>(null);
 
   const changeNetwork = (networkId: string) => {
@@ -337,10 +342,20 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
                         : undefined
                     }
                     options={[
-                      ...catalogApps.map((a) => ({ value: a.id, label: a.name })),
+                      // Each app shows its contract on this network under its name, when known.
+                      ...catalogApps.map((a) => {
+                        const contract = a.contracts?.[rule.networkId];
+                        return {
+                          value: a.id,
+                          label: a.name,
+                          ...(contract ? { description: maskAddress(contract), copyValue: contract } : {}),
+                        };
+                      }),
                       ...customApps.map((a) => ({
                         value: `${CUSTOM_APP_PREFIX}${a.address}`,
-                        label: `${a.name} · ${maskAddress(a.address)}`,
+                        label: a.name,
+                        description: maskAddress(a.address),
+                        copyValue: getAddress(a.address),
                       })),
                     ]}
                     onChange={(value) =>

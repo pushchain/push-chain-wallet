@@ -18,6 +18,8 @@ export type AgenticAppFunction = {
   label: string;
   /* Canonical signature, e.g. 'exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))' */
   signature?: string;
+  /* Argument pins the SDK's reviewed catalog attaches, e.g. the wallet as the beneficiary */
+  pins?: Pin[];
 };
 
 export type AgenticApp = {

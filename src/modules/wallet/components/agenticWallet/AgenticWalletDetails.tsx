@@ -4,11 +4,12 @@ import { Add, Download, ExternalLinkIcon, SendNotification, SwapDashboard, Yield
 import { FAUCET_URL } from 'common';
 import { useWalletOperations } from '../../../../hooks/useWalletOperations';
 import { formatTokenValue } from '../../Wallet.utils';
-import { AText, Card, ErrorText, PrimaryButton, Screen, ScrollBody, SecondaryButton } from './AgenticWallet.styles';
+import { AText, Card, PrimaryButton, Screen, ScrollBody, SecondaryButton } from './AgenticWallet.styles';
 import { AgenticWallet } from './agenticWallet.types';
 import { AgenticHeader } from './components/AgenticHeader';
 import { LineTabs } from './components/FormControls';
 import { RulesByNetwork } from './components/RuleSummary';
+import { DeleteRuleSheet } from './components/CustomSheets';
 
 type DetailsTab = 'tokens' | 'rules' | 'activity' | 'subAccounts';
 
@@ -40,20 +41,11 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
   onDeleteRule,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('rules');
-  const [ruleAction, setRuleAction] = useState<{ busy: boolean; error?: string }>({ busy: false });
+  /* Rule waiting for "Delete Rule" in the confirmation sheet */
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const { data: balance } = useWalletOperations(wallet.address);
   const balanceValue = Number(balance ?? 0);
   const hasFunds = balanceValue > 0;
-
-  const deleteRule = async (index: number) => {
-    setRuleAction({ busy: true });
-    try {
-      await onDeleteRule(index);
-      setRuleAction({ busy: false });
-    } catch (error) {
-      setRuleAction({ busy: false, error: error instanceof Error ? error.message : String(error) });
-    }
-  };
 
   return (
     <Screen gap={hasFunds ? "var(--spacing-md)" : "var(--spacing-sm)"}>
@@ -134,12 +126,6 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
                   Add rules
                 </SecondaryButton>
               </RulesIntro>
-              {ruleAction.busy && (
-                <AText variant="caption-regular" color="var(--pw-int-text-tertiary-color)" align="center">
-                  Deleting rule… confirm in your wallet.
-                </AText>
-              )}
-              {ruleAction.error && <ErrorText>{ruleAction.error}</ErrorText>}
               {wallet.unsupportedRules > 0 && (
                 <AText variant="caption-regular" color="var(--pw-int-text-tertiary-color)">
                   {`${wallet.unsupportedRules} more ${wallet.unsupportedRules === 1 ? 'rule is' : 'rules are'} active on this wallet but can't be shown here yet.`}
@@ -148,7 +134,7 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
               <RulesByNetwork
                 rules={wallet.rules}
                 onEditRule={onEditRule}
-                onDeleteRule={ruleAction.busy ? undefined : deleteRule}
+                onDeleteRule={setPendingDelete}
               />
             </RulesTab>
           )}
@@ -156,6 +142,14 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
           {activeTab === 'subAccounts' && <EmptyTab text="No sub-accounts yet." />}
         </TabsSection>
       </ScrollBody>
+
+      {pendingDelete !== null && (
+        <DeleteRuleSheet
+          ruleNumber={pendingDelete + 1}
+          onClose={() => setPendingDelete(null)}
+          onDelete={() => onDeleteRule(pendingDelete)}
+        />
+      )}
     </Screen>
   );
 };
