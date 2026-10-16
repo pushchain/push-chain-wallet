@@ -14,6 +14,7 @@ import {
   findDuplicateToken,
   getAppsForNetwork,
   getNetwork,
+  getRuleAppFunctionCount,
   hasRuleAppTarget,
   isRuleStepOneValid,
   isRuleStepThreeValid,
@@ -180,7 +181,11 @@ const StepTwo: FC<{
         <Section gap="var(--spacing-xxs)">
           <StepOverline>{`Rule ${ruleNumber} - Step 2`}</StepOverline>
           <Section gap="var(--spacing-sm)">
-            <SectionHeading title="Allowed Tokens" description="Add tokens that agents are allowed to interact with." />
+            <SectionHeading
+              title="Allowed Tokens"
+              tag="Optional"
+              description="Add tokens that agents are allowed to interact with."
+            />
             {rule.tokens.map((row, index) => (
               <TokenCard
                 key={index}
@@ -192,11 +197,8 @@ const StepTwo: FC<{
                 networkId={rule.networkId}
                 onChange={(next) => setRow(index, next)}
                 onAddCustom={() => setTokenSheetFor(index)}
-                onRemove={() => {
-                  // Deleting the only token leaves an empty one to fill in.
-                  const tokens = rule.tokens.filter((_, i) => i !== index);
-                  onChange({ ...rule, tokens: tokens.length ? tokens : [emptyTokenRow(rule.networkId, [])] });
-                }}
+                // Tokens are optional: deleting the last one leaves just "Add new token".
+                onRemove={() => onChange({ ...rule, tokens: rule.tokens.filter((_, i) => i !== index) })}
               />
             ))}
           </Section>
@@ -317,6 +319,8 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
             <Card key={index} gap="var(--spacing-xxs)">
               <CardLabel
                 label={`App ${index + 1}`}
+                // An empty only card has nothing to delete (deleting would leave the same empty card).
+                menuDisabled={rule.apps.length === 1 && !hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) === 0}
                 menuItems={[
                   {
                     key: 'delete',

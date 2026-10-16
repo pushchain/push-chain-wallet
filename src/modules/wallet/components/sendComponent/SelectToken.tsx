@@ -28,7 +28,7 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
 
   const { walletAddress } = useSendTokenContext();
   const { state } = useGlobalState();
-  const { executorAddress } = usePushChain();
+  const { executorAddress, agenticWallet } = usePushChain();
 
   const { tokens, prc20Tokens, moveableTokens, fetchTokenDetails } = useTokenManager();
 
@@ -47,7 +47,8 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
       });
   }, [tokens, moveableTokens, prc20Tokens]);
 
-  const shouldShowOriginTokens = executorAddress !== result.address;
+  // An agentic wallet spends only its own funds; the signer's origin-chain tokens are the owner's.
+  const shouldShowOriginTokens = !agenticWallet && executorAddress !== result.address;
   const originTokens = useMemo(
     () => shouldShowOriginTokens ? getOriginChainTokens(result) : [],
     [result, shouldShowOriginTokens],

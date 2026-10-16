@@ -38,14 +38,35 @@ const SubtitleRow = styled.div`
   }
 `;
 
-export const SectionHeading: FC<{ title: string; description: string }> = ({ title, description }) => (
+export const SectionHeading: FC<{ title: string; description: string; tag?: string }> = ({ title, description, tag }) => (
   <Column>
-    <AText variant="heading-5">{title}</AText>
+    <TitleRow>
+      <AText variant="heading-5">{title}</AText>
+      {tag && <HeadingTag>{tag}</HeadingTag>}
+    </TitleRow>
     <AText variant="caption-regular" color="var(--pw-int-text-tertiary-color)">
       {description}
     </AText>
   </Column>
 );
+
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+`;
+
+/* "Optional" beside a section title: small tag on surface/tertiary, as the function tags */
+const HeadingTag = styled.span`
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-xxxs);
+  background: var(--pw-int-bg-tertiary-color);
+  color: var(--pw-int-text-tertiary-color);
+  font-family: var(--pw-int-font-family);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 500;
+`;
 
 /* "RULE 1 - STEP 1" */
 export const StepOverline: FC<{ children: ReactNode }> = ({ children }) => (
@@ -160,12 +181,22 @@ const TabButton = styled.button<{ $active: boolean }>`
 `;
 
 /* Card header row: "APP 1" / "TOKEN 1" / "RULE 1" with an optional kebab menu. */
-export const CardLabel: FC<{ label: string; menuItems?: AgenticMenuItem[] }> = ({ label, menuItems }) => (
+export const CardLabel: FC<{ label: string; menuItems?: AgenticMenuItem[]; menuDisabled?: boolean }> = ({
+  label,
+  menuItems,
+  menuDisabled,
+}) => (
   <CardLabelRow>
     <AText variant="overline-small-bold" color="var(--pw-int-text-secondary-color)" uppercase>
       {label}
     </AText>
-    {menuItems && menuItems.length > 0 && (
+    {menuItems && menuItems.length > 0 && menuDisabled && (
+      /* Nothing to act on yet (e.g. an empty app card) */
+      <KebabButton aria-label={`${label} options`} disabled>
+        <KebabMenuVertical size={16} color="pw-int-icon-tertiary-color" />
+      </KebabButton>
+    )}
+    {menuItems && menuItems.length > 0 && !menuDisabled && (
       /* The rule menu opens over its own trigger, as drawn in the design */
       <AgenticMenu items={menuItems} sideOffset={-14} alignOffset={-2}>
         <KebabButton aria-label={`${label} options`}>
@@ -191,6 +222,10 @@ const KebabButton = styled.button`
   border: none;
   background: transparent;
   cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 `;
 
 /* Figma "Base Component/Input Field" */

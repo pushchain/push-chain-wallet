@@ -19,6 +19,7 @@ const AGENT = getAddress('0x9cfa1c55e8b23fb4c2a3e2d55d0b1c7b0ae4ebdc');
 // A contract outside the catalog, used as a custom app
 const ROUTER = getAddress('0x1111111111111111111111111111111111111111');
 const UNISWAP_SEPOLIA = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E';
+const AAVE_USDC_SEPOLIA = '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8';
 
 const usdc = () => getNetworkTokens('ethereum').find((t) => t.symbol === 'USDC')!;
 
@@ -152,10 +153,25 @@ describe('fromPresetTemplate', () => {
     expect(presets.length).toBeGreaterThan(0);
     const rules = presets[0].buildRules(AGENT);
     expect(rules.length).toBeGreaterThan(0);
-    rules.forEach((rule) => {
-      expect(rule.agentAddress).toBe(AGENT);
-      expect(() => toSdkRule(rule)).not.toThrow();
+    rules.forEach((rule) => expect(rule.agentAddress).toBe(AGENT));
+  });
+
+  it('needs tokens before a preset rule can be granted, then takes the SDK token pins', () => {
+    const dex = getAgenticPresets().find((p) => p.key === 'DEXES')!;
+    const sepolia = dex.buildRules(AGENT).find((rule) => rule.networkId === 'ethereum')!;
+    // No tokens: every swap would be capped at zero, so it is reported instead of granted.
+    expect(() => toSdkRule(sepolia)).toThrow(AgenticInputError);
+
+    const weth = getNetworkTokens('ethereum').find((t) => t.symbol === 'WETH')!;
+    const rule = toSdkRule({
+      ...sepolia,
+      tokens: [
+        { token: usdc(), totalLimit: '', perTxLimit: '100' },
+        { token: weth, totalLimit: '', perTxLimit: '1' },
+      ],
     });
+    expect(rule.allowedCalls.length).toBeGreaterThan(0);
+    rule.allowedCalls.forEach((call) => expect(call.pins?.length).toBeGreaterThan(1));
   });
 });
 
@@ -187,15 +203,39 @@ describe('app catalog from the SDK', () => {
     expect(getApp('curve')?.contracts?.ethereum).toBeUndefined();
   });
 
-  it('sends catalog functions with their signature and the SDK pins', () => {
+  it('sends catalog functions with the pins the SDK generates for the selected token', () => {
     const aave = getApp('aave')!;
     const supply = aave.functions.find((fn) => fn.label === 'Supply')!;
-    const rule = toSdkRule(draft({ apps: [{ appId: 'aave', functionIds: [supply.id] }] }));
+    // Aave's Sepolia USDC reserve, added as a custom token
+    const reserve = { address: AAVE_USDC_SEPOLIA, symbol: 'USDC', decimals: 6 };
+    const rule = toSdkRule(
+      draft({
+        apps: [{ appId: 'aave', functionIds: [supply.id] }],
+        tokens: [{ token: reserve, totalLimit: '1,000', perTxLimit: '100' }],
+      }),
+    );
+    expect(rule.allowedCalls).toHaveLength(1);
     expect(rule.allowedCalls[0]).toMatchObject({
       target: aave.contracts!.ethereum,
       selector: 'supply(address,uint256,address,uint16)',
-      pins: [{ arg: 2, expected: 'agentic:wallet' }],
     });
+    expect(rule.allowedCalls[0].pins).toEqual(
+      expect.arrayContaining([
+        { arg: 2, expected: 'agentic:wallet' },
+        { arg: 0, expected: AAVE_USDC_SEPOLIA },
+        { arg: 1, max: 100_000_000n },
+      ]),
+    );
+  });
+
+  it('rejects a catalog function none of whose tokens is selected', () => {
+    const aave = getApp('aave')!;
+    const supply = aave.functions.find((fn) => fn.label === 'Supply')!;
+    const build = (tokens: AgenticRule['tokens']) =>
+      toSdkRule(draft({ apps: [{ appId: 'aave', functionIds: [supply.id] }], tokens }));
+    // Push's USDC is not an Aave reserve; no token at all leaves a zero amount cap.
+    expect(() => build([{ token: usdc(), totalLimit: '', perTxLimit: '' }])).toThrow(AgenticInputError);
+    expect(() => build([])).toThrow(/Supply on Aave/);
   });
 
   it('reads a granted call to a catalog contract back as that app', () => {

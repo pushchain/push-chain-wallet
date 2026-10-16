@@ -34,6 +34,9 @@ const formatBlockscoutBalance = (value: string | number | null | undefined, deci
     };
 };
 
+/* Last fetched PRC20 balances per account, shown at once when a token list mounts again. */
+const prc20Cache = new Map<string, TokenFormat[]>();
+
 export function useTokenManager() {
     const [tokens, setTokens] = useState<TokenFormat[]>([DEFAULT_TOKEN]);
     const [prc20Tokens, setPrc20Tokens] = useState<TokenFormat[]>([]);
@@ -95,6 +98,8 @@ export function useTokenManager() {
                 inFlight = true;
 
                 const account = pushChainClient.universal.account as string | undefined;
+                const cached = account ? prc20Cache.get(account.toLowerCase()) : undefined;
+                if (cached && !cancelled) setPrc20Tokens(cached);
 
                 if (!account || !isAddress(account)) {
                     if (!cancelled) setPrc20Tokens([]);
@@ -150,6 +155,7 @@ export function useTokenManager() {
                     })
                     .filter((t) => isAddress(t.address as `0x${string}`));
 
+                prc20Cache.set(account.toLowerCase(), mapped);
                 if (!cancelled) setPrc20Tokens(mapped);
                 inFlight = false;
             } catch (err) {

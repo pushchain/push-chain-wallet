@@ -199,9 +199,13 @@ const buildSubAccount = async (
     };
 };
 
+/* Last loaded sub-accounts per account, so returning to the tab shows them at once while they refresh. */
+const subAccountsCache = new Map<string, SubAccount[]>();
+
 const SubAccountsList: FC = () => {
     const { pushChainClient } = usePushChain();
-    const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
+    const account = (pushChainClient?.universal.account as string | undefined)?.toLowerCase();
+    const [subAccounts, setSubAccounts] = useState<SubAccount[]>(() => (account && subAccountsCache.get(account)) || []);
     const [expandedChain, setExpandedChain] = useState<CHAIN | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -246,7 +250,9 @@ const SubAccountsList: FC = () => {
                 );
 
                 if (!cancelled) {
-                    setSubAccounts(accounts.filter(Boolean) as SubAccount[]);
+                    const loaded = accounts.filter(Boolean) as SubAccount[];
+                    subAccountsCache.set(ueaAddress.toLowerCase(), loaded);
+                    setSubAccounts(loaded);
                 }
             } catch (loadError) {
                 console.error('Failed to load sub-accounts:', loadError);
@@ -256,7 +262,12 @@ const SubAccountsList: FC = () => {
             }
         };
 
-        loadSubAccounts(true);
+        // The skeleton only shows the first time; cached sub-accounts refresh quietly.
+        const cached = subAccountsCache.get(
+            ((pushChainClient?.universal.account as string | undefined) ?? '').toLowerCase(),
+        );
+        if (cached) setSubAccounts(cached);
+        loadSubAccounts(!cached);
         const intervalId = window.setInterval(
             () => loadSubAccounts(false),
             POLL_MS,

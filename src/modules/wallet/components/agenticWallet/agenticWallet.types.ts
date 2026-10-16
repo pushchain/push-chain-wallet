@@ -1,4 +1,4 @@
-import type { Pin } from '@pushchain/core';
+import type { Pin, PresetCategory } from '@pushchain/core';
 
 export type AgenticNetwork = {
   id: string;
@@ -20,6 +20,8 @@ export type AgenticAppFunction = {
   signature?: string;
   /* Argument pins the SDK's reviewed catalog attaches, e.g. the wallet as the beneficiary */
   pins?: Pin[];
+  /* SDK preset the function comes from; its token and amount pins are generated from the rule's tokens */
+  preset?: PresetCategory;
 };
 
 export type AgenticApp = {

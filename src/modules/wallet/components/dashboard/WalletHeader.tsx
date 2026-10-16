@@ -28,6 +28,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "../../../../constants";
 import { useEventEmitterContext } from "../../../../context/EventEmitterContext";
+import { usePushChain } from "../../../../context/PushChainContext";
 import { useGlobalState } from "../../../../context/GlobalContext";
 import { useExternalWallet } from "../../../../context/ExternalWalletContext";
 import styled, { css } from "styled-components";
@@ -86,7 +87,9 @@ const WalletHeader: FC<WalletHeaderProps> = ({ walletAddress, handleBackButton, 
         );
     };
 
-    const originAddress = state.externalWallet && state.externalWallet.originAddress ? convertCaipToObject(state.externalWallet.originAddress).result : null;
+    const { agenticWallet } = usePushChain();
+    // An agentic wallet has no origin account of its own; the connected origin is the owner's.
+    const originAddress = !agenticWallet && state.externalWallet && state.externalWallet.originAddress ? convertCaipToObject(state.externalWallet.originAddress).result : null;
 
     return (
         <Box

@@ -220,9 +220,11 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
           if (!app.functions.some((fn) => fn.id === call.selector)) {
             app.functions.push({
               id: call.selector,
-              label: call.label ?? formatFunctionSignature(call.selector),
+              // Labels of zero-cap review calls carry a hint, e.g. "Swap exact input (select two tokens to enable)".
+              label: call.label?.replace(/\s*\(select [^)]*\)$/, '') ?? formatFunctionSignature(call.selector),
               signature: call.selector,
               ...(call.pins?.length ? { pins: call.pins } : {}),
+              preset: preset.constant,
             });
           }
         });

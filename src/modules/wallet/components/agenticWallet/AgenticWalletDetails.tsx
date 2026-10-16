@@ -1,4 +1,11 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
+import { usePushChain } from '../../../../context/PushChainContext';
+import type { TokenDetails } from '../../../../context/SendTokenContext';
+import { ActiveStates } from '../../../../types';
+import { AgenticScope } from './components/AgenticScope';
+import { SwapTransactionDrawer } from '../swapComponent/SwapTransactionDrawer';
+import { SubAccountsList } from '../SubAccountsList';
+import { TokensList } from '../TokensList';
 import styled from 'styled-components';
 import { Add, Download, ExternalLinkIcon, SendNotification, SwapDashboard, YieldFarming } from 'blocks';
 import { FAUCET_URL } from 'common';
@@ -13,12 +20,20 @@ import { DeleteRuleSheet } from './components/CustomSheets';
 
 type DetailsTab = 'tokens' | 'rules' | 'activity' | 'subAccounts';
 
+/* Last tab per wallet, so coming back from Send, Swap or Manage Tokens lands where the user left */
+const lastTab = new Map<string, DetailsTab>();
+
 type AgenticWalletDetailsProps = {
   wallet: AgenticWallet;
   onBack: () => void;
   onClose: () => void;
   /* Opens the Receive page for this wallet's address */
   onReceive: () => void;
+  /* Send / Swap from this wallet (the normal flows, run as the agentic wallet) */
+  onSend: () => void;
+  onSwap: () => void;
+  /* Navigation requested from inside the tabs' wallet screens, e.g. a token row opening Send */
+  onScopeNavigate: (state: ActiveStates, tokenDetails?: TokenDetails) => void;
   onAddRule: () => void;
   onEditRule: (index: number) => void;
   /* Revokes on chain; rejects with a message to show */
@@ -36,14 +51,26 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
   onBack,
   onClose,
   onReceive,
+  onSend,
+  onSwap,
+  onScopeNavigate,
   onAddRule,
   onEditRule,
   onDeleteRule,
 }) => {
-  const [activeTab, setActiveTab] = useState<DetailsTab>('rules');
+  const [activeTab, setActiveTab] = useState<DetailsTab>(() => lastTab.get(wallet.address) ?? 'rules');
+  useEffect(() => {
+    lastTab.set(wallet.address, activeTab);
+  }, [wallet.address, activeTab]);
   /* Rule waiting for "Delete Rule" in the confirmation sheet */
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const { data: balance } = useWalletOperations(wallet.address);
+  const { createAgenticClient } = usePushChain();
+  // Start the agentic client as the page opens, so the Tokens and Sub-Accounts tabs are ready.
+  useEffect(() => {
+    createAgenticClient(wallet.address).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet.address]);
   const balanceValue = Number(balance ?? 0);
   const hasFunds = balanceValue > 0;
 
@@ -92,8 +119,11 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
 
           <Actions>
             {ACTIONS.map(({ label, Icon }) => (
-              // Send and Swap from an agentic wallet need the SDK's agenticWallet client mode; not wired yet.
-              <ActionButton key={label} type="button" onClick={label === 'Receive' ? onReceive : undefined}>
+              <ActionButton
+                key={label}
+                type="button"
+                onClick={label === 'Receive' ? onReceive : label === 'Send' ? onSend : onSwap}
+              >
                 <Icon size={24} color="pw-int-icon-brand-color" />
                 <AText variant="body-xs-medium" nowrap>
                   {label}
@@ -114,7 +144,11 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
               { key: 'subAccounts', label: 'Sub-Accounts' },
             ]}
           />
-          {activeTab === 'tokens' && <EmptyTab text="No tokens in this wallet yet." />}
+          {activeTab === 'tokens' && (
+            <AgenticScope wallet={wallet.address} activeState="walletDashboard" onNavigate={onScopeNavigate}>
+              <TokensList agentic setActiveState={(state) => onScopeNavigate(state)} />
+            </AgenticScope>
+          )}
           {activeTab === 'rules' && (
             <RulesTab>
               <RulesIntro>
@@ -131,17 +165,34 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
                   {`${wallet.unsupportedRules} more ${wallet.unsupportedRules === 1 ? 'rule is' : 'rules are'} active on this wallet but can't be shown here yet.`}
                 </AText>
               )}
-              <RulesByNetwork
-                rules={wallet.rules}
-                onEditRule={onEditRule}
-                onDeleteRule={setPendingDelete}
-              />
+              {wallet.rules.length === 0 && wallet.unsupportedRules === 0 ? (
+                /* Figma "Agentic Wallet Inside (No Rules)" */
+                <NoRules>
+                  <AText variant="heading-5" align="center">
+                    No rules assigned to wallet
+                  </AText>
+                  <AText variant="body-xs-regular" color="var(--pw-int-text-secondary-color)" align="center">
+                    Add rules to your agentic wallet to get started.
+                  </AText>
+                </NoRules>
+              ) : (
+                <RulesByNetwork rules={wallet.rules} onEditRule={onEditRule} onDeleteRule={setPendingDelete} />
+              )}
             </RulesTab>
           )}
           {activeTab === 'activity' && <EmptyTab text="No activity yet." />}
-          {activeTab === 'subAccounts' && <EmptyTab text="No sub-accounts yet." />}
+          {activeTab === 'subAccounts' && (
+            <AgenticScope wallet={wallet.address} activeState="walletDashboard" onNavigate={onScopeNavigate}>
+              <SubAccountsList />
+            </AgenticScope>
+          )}
         </TabsSection>
       </ScrollBody>
+
+      {/* Same swap progress drawer as the home dashboard, for swaps made from this wallet */}
+      <AgenticScope wallet={wallet.address} activeState="walletDashboard" onNavigate={onScopeNavigate}>
+        <SwapTransactionDrawer />
+      </AgenticScope>
 
       {pendingDelete !== null && (
         <DeleteRuleSheet
@@ -268,6 +319,14 @@ const RulesIntro = styled.div`
   > span {
     flex: 1;
   }
+`;
+
+const NoRules = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
 `;
 
 const EmptyTabBox = styled.div`

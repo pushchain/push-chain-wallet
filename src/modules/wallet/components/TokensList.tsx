@@ -13,10 +13,17 @@ import { useWalletDashboard } from '../../../context/WalletDashboardContext';
 import { useTokenBalance } from '../../../hooks/useTokenBalance';
 
 type TokensListProps = {
-    setActiveState: (activeStates: ActiveStates) => void;
+    setActiveState?: (activeStates: ActiveStates) => void;
+    /*
+     * An agentic wallet's tokens (inside its AgenticScope): only its Push Chain balances, as
+     * the signer's origin-chain balances belong to the owner. Rows open the agentic wallet's
+     * Send, and Manage Tokens opens inside the agentic wallet (setActiveState is its navigation).
+     */
+    agentic?: boolean;
 }
 const TokensList: FC<TokensListProps> = ({
-    setActiveState
+    setActiveState,
+    agentic = false,
 }) => {
 
     const { tokens, moveableTokens, prc20Tokens } = useTokenManager();
@@ -36,11 +43,12 @@ const TokensList: FC<TokensListProps> = ({
     const filteredTokens = useMemo(() => {
         return tokens.filter((t) => {
             const addr = (t?.address ?? '').toLowerCase();
-            const existsInMoveable = moveableTokens.some((mt) => (mt?.address ?? '').toLowerCase() === addr);
+            // Agentic mode shows no origin-chain moveable rows, so nothing to de-duplicate against (PC shares the zero address).
+            const existsInMoveable = !agentic && moveableTokens.some((mt) => (mt?.address ?? '').toLowerCase() === addr);
             const existsInPrc20 = prc20Tokens.some((pt) => (pt?.address ?? '').toLowerCase() === addr);
             return !existsInMoveable && !existsInPrc20;
         });
-    }, [tokens, moveableTokens, prc20Tokens]);
+    }, [tokens, moveableTokens, prc20Tokens, agentic]);
 
     return (
 
@@ -61,7 +69,7 @@ const TokensList: FC<TokensListProps> = ({
                     margin-right: -8px;
                 `}
             >
-                {executorAddress !== result.address && (
+                {!agentic && executorAddress !== result.address && (
                     <OriginChainTokenList
                         originWalletAddress={parsedWallet}
                         showFaucet={shouldShowFaucetOnOrigin}
@@ -82,10 +90,10 @@ const TokensList: FC<TokensListProps> = ({
                         key={token.address}
                         walletDetails={result}
                         handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false, source: 'push' })}
-                        showFaucet={!shouldShowFaucetOnOrigin && token.symbol === 'PC'}
+                        showFaucet={!agentic && !shouldShowFaucetOnOrigin && token.symbol === 'PC'}
                     />
                 ))}
-                {moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
+                {!agentic && moveableTokens.filter(t => t.address !== "0x0000000000000000000000000000000000000000")
                     .map((token: TokenFormat) => (
                         <TokensListItem token={token} key={token.address} walletDetails={result} isMoveable handleSelectToken={() => startSendFlow({ token: token, chainId: result.chainId, native: false, source: 'origin', sourceWallet: result })} />
                 ))}
@@ -94,6 +102,7 @@ const TokensList: FC<TokensListProps> = ({
                         <TokensListItem token={token} key={token.address} walletDetails={null} handleSelectToken={() => startSendFlow({ token: token, chainId: '42101', native: false, source: 'push' })} />
                 ))}
             </Box>
+            {setActiveState && (
             <Box
                 display='flex'
                 justifyContent='center'
@@ -106,6 +115,7 @@ const TokensList: FC<TokensListProps> = ({
                 <YieldFarming color='pw-int-icon-brand-color' />
                 <Text variant='bs-regular' color='pw-int-text-link-color'>Manage Tokens</Text>
             </Box>
+            )}
         </Box>
 
     );
