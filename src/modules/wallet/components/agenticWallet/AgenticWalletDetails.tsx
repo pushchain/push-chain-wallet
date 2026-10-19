@@ -7,7 +7,7 @@ import { SwapTransactionDrawer } from '../swapComponent/SwapTransactionDrawer';
 import { SubAccountsList } from '../SubAccountsList';
 import { TokensList } from '../TokensList';
 import styled from 'styled-components';
-import { Add, Download, ExternalLinkIcon, SendNotification, SwapDashboard, YieldFarming } from 'blocks';
+import { Add, Download, ExternalLinkIcon, SendNotification, Spinner, SwapDashboard, YieldFarming } from 'blocks';
 import { FAUCET_URL } from 'common';
 import { useWalletOperations } from '../../../../hooks/useWalletOperations';
 import { formatTokenValue } from '../../Wallet.utils';
@@ -64,7 +64,7 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
   }, [wallet.address, activeTab]);
   /* Rule waiting for "Delete Rule" in the confirmation sheet */
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
-  const { data: balance } = useWalletOperations(wallet.address);
+  const { data: balance, isLoading: isBalanceLoading } = useWalletOperations(wallet.address);
   const { createAgenticClient } = usePushChain();
   // Start the agentic client as the page opens, so the Tokens and Sub-Accounts tabs are ready.
   useEffect(() => {
@@ -72,7 +72,8 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet.address]);
   const balanceValue = Number(balance ?? 0);
-  const hasFunds = balanceValue > 0;
+  // Until the first balance arrives, show the home page's spinner, not the "Fund your wallet" card.
+  const hasFunds = isBalanceLoading || balanceValue > 0;
 
   return (
     <Screen gap={hasFunds ? "var(--spacing-md)" : "var(--spacing-sm)"}>
@@ -88,9 +89,15 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
         <TopSection>
           {hasFunds ? (
             <Balance>
-              <AText variant="balance" align="center">
-                {`${formatTokenValue(balanceValue, balanceValue < 1 ? 6 : 2)} PC`}
-              </AText>
+              {isBalanceLoading ? (
+                <BalanceLoading>
+                  <Spinner size="extraLarge" variant="primary" />
+                </BalanceLoading>
+              ) : (
+                <AText variant="balance" align="center">
+                  {`${formatTokenValue(balanceValue, balanceValue < 1 ? 6 : 2)} PC`}
+                </AText>
+              )}
               <FaucetLink />
             </Balance>
           ) : (
@@ -235,6 +242,14 @@ const Balance = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+`;
+
+/* Same height as the balance text, so nothing shifts when it loads */
+const BalanceLoading = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
 `;
 
 const LinkRow = styled.a`

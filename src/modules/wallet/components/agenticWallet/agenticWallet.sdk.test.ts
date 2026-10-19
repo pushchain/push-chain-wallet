@@ -412,7 +412,8 @@ describe('Solana rules', () => {
       maxGasPerCall: '0.1',
     });
 
-    const unknown = { ...record, rule: { ...(record.rule as object), programs: [{ ...(record.rule as { programs: object[] }).programs[0], discriminator: '0x0102030405060708' }] } };
-    expect(fromRulesRecord(unknown as RulesRecord)).toBeNull();
+    const stored = record.rule as unknown as { programs: object[] };
+    const unknown = { ...record, rule: { ...stored, programs: [{ ...stored.programs[0], discriminator: '0x0102030405060708' }] } };
+    expect(fromRulesRecord(unknown as unknown as RulesRecord)).toBeNull();
   });
 });
