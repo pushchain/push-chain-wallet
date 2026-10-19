@@ -11,6 +11,8 @@ export type AgenticNetwork = {
   explorerApi?: string;
   /* Prefilled "Max gas per call", in PC */
   defaultGasPerCall: string;
+  /* Solana: programs, instruction signatures and account pins instead of EVM contracts and ABIs */
+  vm?: 'svm';
 };
 
 export type AgenticAppFunction = {
@@ -22,14 +24,16 @@ export type AgenticAppFunction = {
   pins?: Pin[];
   /* SDK preset the function comes from; its token and amount pins are generated from the rule's tokens */
   preset?: PresetCategory;
+  /* Solana: the argument holding the SOL amount, capped at the rule's SOL per transaction limit */
+  amountArg?: number;
 };
 
 export type AgenticApp = {
   id: string;
   name: string;
   networks: string[];
-  /* Contract the agent calls, per network id */
-  contracts?: Partial<Record<string, `0x${string}`>>;
+  /* Contract (EVM) or program ID (Solana) the agent calls, per network id */
+  contracts?: Partial<Record<string, string>>;
   functions: AgenticAppFunction[];
 };
 

@@ -11,6 +11,9 @@ export const isEvmAddress = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value.
 export const getNetwork = (networkId: string) =>
   AGENTIC_NETWORKS.find((network) => network.id === networkId) ?? AGENTIC_NETWORKS[0];
 
+/* Solana rules use programs and account pins; custom contracts, ABIs and token lookups are EVM only. */
+export const isSolanaNetwork = (networkId: string) => getNetwork(networkId).vm === 'svm';
+
 export const getApp = (appId: string | null) => AGENTIC_APPS.find((app) => app.id === appId);
 
 export const getAppsForNetwork = (networkId: string) =>
@@ -61,11 +64,18 @@ export const findDuplicateToken = (tokens: RuleToken[]) => {
   return null;
 };
 
-export const formatAllowedApps = (rule: AgenticRule) =>
-  rule.apps
+/*
+ * App names, once each. Preset approvals ("Approve token spending" on the rule's own token
+ * contracts) are permissions for the app, not apps, so they are left out of the list.
+ */
+export const formatAllowedApps = (rule: AgenticRule) => {
+  const tokenContracts = new Set(rule.tokens.map((row) => row.token?.address.toLowerCase()).filter(Boolean));
+  const names = rule.apps
+    .filter((ruleApp) => !ruleApp.customContract || !tokenContracts.has(ruleApp.customContract.toLowerCase()))
     .map((ruleApp) => getRuleAppName(ruleApp, rule.networkId))
-    .filter(Boolean)
-    .join(' · ') || '—';
+    .filter((name): name is string => !!name);
+  return [...new Set(names)].join(' · ') || '—';
+};
 
 /* A function's 4-byte selector, whether stored as a signature or already as the selector. */
 const selectorOf = (signature: string) =>

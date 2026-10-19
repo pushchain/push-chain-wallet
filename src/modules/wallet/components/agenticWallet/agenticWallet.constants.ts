@@ -8,8 +8,8 @@ const CHAIN = PushChain.CONSTANTS.CHAIN;
 
 /*
  * Networks an agentic wallet can act on. The wallet runs on Push Testnet Donut, so these
- * are the matching testnets the AGW SDK supports. Solana needs an Anchor IDL per rule,
- * which the rule screens cannot collect yet, so it is not offered.
+ * are the matching testnets the AGW SDK supports. Solana (devnet) only offers listed
+ * programs, since each instruction needs the wallet's account position (an account pin).
  *
  * defaultGasPerCall prefills "Max gas per call" (PC per outbound). TODO: placeholder
  * values until product confirms a per-chain default.
@@ -45,6 +45,14 @@ export const AGENTIC_NETWORKS: AgenticNetwork[] = [
     chain: CHAIN.BNB_TESTNET,
     chainId: 97,
     defaultGasPerCall: '0.1',
+  },
+  {
+    id: 'solana',
+    name: 'Solana',
+    chain: CHAIN.SOLANA_DEVNET,
+    chainId: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    defaultGasPerCall: '0.1',
+    vm: 'svm',
   },
 ];
 
@@ -212,8 +220,9 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
           if (existing && existing.toLowerCase() !== call.target.toLowerCase()) return;
           app.contracts[network.id] = getAddress(call.target);
           if (!app.networks.includes(network.id)) app.networks.push(network.id);
-          // The SDK's functions replace the placeholder ones, which have no signatures.
+          // The SDK's name and functions replace the placeholder ones (which have no signatures).
           if (!fromSdk.has(id)) {
+            app.name = call.app;
             app.functions = [];
             fromSdk.add(id);
           }
@@ -233,7 +242,43 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
   return [...byId.values()];
 };
 
-export const AGENTIC_APPS: AgenticApp[] = withSdkCatalog(PLACEHOLDER_APPS);
+/*
+ * Solana programs. TODO: temporary until the real Solana app list arrives. Push's test
+ * counter program on devnet (the SDK's own Solana test program), with the account
+ * position of the wallet in each instruction and the argument holding the SOL amount.
+ */
+const SOLANA_APPS: AgenticApp[] = [
+  {
+    id: 'push-test-counter',
+    name: 'Push Test Counter',
+    networks: ['solana'],
+    contracts: { solana: '8yNqjrMnFiFbVTVQcKij8tNWWTMdFkrDf9abCGgc2sgx' },
+    functions: [
+      // accounts: counter, authority
+      { id: 'increment(u64)', label: 'Increment', signature: 'increment(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
+      { id: 'decrement(u64)', label: 'Decrement', signature: 'decrement(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
+      // accounts: counter, recipient, cea_authority, system_program
+      {
+        id: 'receive_sol(u64)',
+        label: 'Send SOL',
+        signature: 'receive_sol(u64)',
+        pins: [{ account: 2, expected: 'agentic:wallet' }],
+        amountArg: 0,
+      },
+      // accounts: counter, authority, stake, stake_vault, system_program
+      {
+        id: 'stake_sol(u64)',
+        label: 'Stake SOL',
+        signature: 'stake_sol(u64)',
+        pins: [{ account: 1, expected: 'agentic:wallet' }],
+        amountArg: 0,
+      },
+      { id: 'unstake_sol(u64)', label: 'Unstake SOL', signature: 'unstake_sol(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
+    ],
+  },
+];
+
+export const AGENTIC_APPS: AgenticApp[] = [...withSdkCatalog(PLACEHOLDER_APPS), ...SOLANA_APPS];
 
 export const WALLET_NAME_MAX_LENGTH = 30;
 

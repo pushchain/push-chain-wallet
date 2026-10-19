@@ -67,9 +67,12 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
   const presetAgentIsOwner =
     !!executorAddress && isEvmAddress(presetAgent) && presetAgent.toLowerCase() === executorAddress.toLowerCase();
 
-  const applyPreset = () => {
+  const [resolvingPreset, setResolvingPreset] = useState(false);
+  const applyPreset = async () => {
     if (!preset) return;
+    setResolvingPreset(true);
     try {
+      await preset.resolveTokens();
       const built = preset.buildRules(presetAgent);
       if (!built.length) throw new Error(`${preset.title} has no rules for the supported networks yet.`);
       setRules(built);
@@ -77,6 +80,8 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
       setPhase('review');
     } catch (error) {
       setPresetError(describeAgenticError(error));
+    } finally {
+      setResolvingPreset(false);
     }
   };
 
@@ -233,10 +238,10 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
             )}
             <PrimaryButton
               type="button"
-              disabled={!isEvmAddress(presetAgent) || presetAgentIsOwner}
+              disabled={!isEvmAddress(presetAgent) || presetAgentIsOwner || resolvingPreset}
               onClick={applyPreset}
             >
-              Next
+              {resolvingPreset ? 'Loading tokens…' : 'Next'}
             </PrimaryButton>
           </Footer>
         </>

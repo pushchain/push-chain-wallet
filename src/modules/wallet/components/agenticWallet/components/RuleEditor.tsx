@@ -20,6 +20,7 @@ import {
   isRuleStepThreeValid,
   isRuleStepTwoValid,
   isEvmAddress,
+  isSolanaNetwork,
   maskAddress,
   sanitizeAmountInput,
 } from '../agenticWallet.utils';
@@ -196,7 +197,8 @@ const StepTwo: FC<{
                   .map((other) => other.token!.address.toLowerCase())}
                 networkId={rule.networkId}
                 onChange={(next) => setRow(index, next)}
-                onAddCustom={() => setTokenSheetFor(index)}
+                // Solana offers the SDK's moveable tokens only (no address lookup there yet).
+                onAddCustom={isSolanaNetwork(rule.networkId) ? undefined : () => setTokenSheetFor(index)}
                 // Tokens are optional: deleting the last one leaves just "Add new token".
                 onRemove={() => onChange({ ...rule, tokens: rule.tokens.filter((_, i) => i !== index) })}
               />
@@ -245,6 +247,7 @@ const CUSTOM_APP_PREFIX = 'custom:';
 
 const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => void }> = ({ rule, onChange }) => {
   const network = getNetwork(rule.networkId);
+  const solana = isSolanaNetwork(rule.networkId);
   const registrySnapshot = useAgenticRegistry();
   const catalogApps = getAppsForNetwork(rule.networkId);
   // A saved custom contract that the catalog now covers (e.g. from the SDK) shows once, as the catalog app.
@@ -370,7 +373,12 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
                           : { appId: value, functionIds: [] },
                       )
                     }
-                    action={{ label: 'Add Custom Contract', onSelect: () => setSheet({ kind: 'contract', appIndex: index }) }}
+                    // Solana takes listed programs only: each instruction needs the wallet's account position.
+                    action={
+                      solana
+                        ? undefined
+                        : { label: 'Add Custom Contract', onSelect: () => setSheet({ kind: 'contract', appIndex: index }) }
+                    }
                   />
                 </Field>
                 <Section gap="var(--spacing-xxs)">
@@ -393,10 +401,11 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
                           customFunctions: values.filter((v) => savedFunctions.includes(v) || selectedCustom.includes(v)),
                         })
                       }
-                      action={{
-                        label: 'Add Custom Functions',
-                        onSelect: () => setSheet({ kind: 'functions', appIndex: index }),
-                      }}
+                      action={
+                        solana
+                          ? undefined
+                          : { label: 'Add Custom Functions', onSelect: () => setSheet({ kind: 'functions', appIndex: index }) }
+                      }
                     />
                   </Field>
                   {tags.length > 0 && (
@@ -462,7 +471,7 @@ type TokenCardProps = {
   usedElsewhere: string[];
   networkId: string;
   onChange: (row: RuleToken) => void;
-  onAddCustom: () => void;
+  onAddCustom?: () => void;
   onRemove: () => void;
 };
 
@@ -487,7 +496,7 @@ const TokenCard: FC<TokenCardProps> = ({ index, row, usedElsewhere, networkId, o
               icon: <TokenIcon symbol={token.symbol} size={20} />,
             }))}
             onChange={(address) => onChange({ ...row, token: tokens.find((t) => t.address.toLowerCase() === address) ?? null })}
-            action={{ label: 'Add Custom Token', onSelect: onAddCustom }}
+            action={onAddCustom && { label: 'Add Custom Token', onSelect: onAddCustom }}
           />
         </Field>
         <LimitsRow>

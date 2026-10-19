@@ -2,7 +2,7 @@ import { PushChain } from '@pushchain/core';
 import type { ForeignChainNamespace } from '@pushchain/core';
 import { getAddress } from 'viem';
 import { AGENTIC_NETWORKS } from './agenticWallet.constants';
-import { defaultToken, fromPresetTemplate } from './agenticWallet.sdk';
+import { defaultToken, fromPresetTemplate, resolveTokens } from './agenticWallet.sdk';
 import { AgenticRule } from './agenticWallet.types';
 import { getNetwork } from './agenticWallet.utils';
 
@@ -26,6 +26,8 @@ export type AgenticPreset = {
   key: string;
   title: string;
   description: string;
+  /* Looks up the preset's default tokens so buildRules can show them by name */
+  resolveTokens: () => Promise<void>;
   /* One rule per supported network the preset covers, for the given agent; the owner reviews and can edit each. */
   buildRules: (agent: string) => AgenticRule[];
 };
@@ -46,6 +48,17 @@ export const getAgenticPresets = (): AgenticPreset[] => {
         key: preset.constant,
         title: preset.name,
         description: networks.map((n) => n.name).join(' · '),
+        resolveTokens: async () => {
+          await Promise.all(
+            networks.map((network) => {
+              const { rules } = presets.get(preset.constant, { chainNamespace: network.chain as ForeignChainNamespace });
+              const addresses = rules.flatMap((rule) =>
+                (rule.assets ?? []).map((asset) => (typeof asset.token === 'string' ? asset.token : asset.token.address)),
+              );
+              return resolveTokens(network.id, addresses);
+            }),
+          );
+        },
         buildRules: (agent: string) =>
           networks.flatMap((network) => {
             const { rules } = presets.get(preset.constant, {

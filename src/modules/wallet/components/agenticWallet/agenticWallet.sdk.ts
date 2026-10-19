@@ -1,13 +1,35 @@
 import { PushChain, AgenticError, AgenticRevertError } from '@pushchain/core';
-import type { AllowedCall, ForeignChainNamespace, Pin, PresetCategory, PresetRuleTemplate, Rule, RulesRecord } from '@pushchain/core';
+import type {
+  AllowedCall,
+  DecodedSolanaRule,
+  ForeignChainNamespace,
+  Pin,
+  PresetCategory,
+  PresetRuleTemplate,
+  Rule,
+  RulesRecord,
+} from '@pushchain/core';
+import { PublicKey } from '@solana/web3.js';
 import type { MoveableToken } from '@pushchain/core/src/lib/constants';
 import type { CHAIN } from '@pushchain/core/src/lib/constants/enums';
-import { formatEther, formatUnits, getAddress, maxUint256, parseEther, parseUnits } from 'viem';
+import {
+  formatEther,
+  formatUnits,
+  getAddress,
+  hexToBytes,
+  maxUint256,
+  parseEther,
+  parseUnits,
+  sha256,
+  toHex,
+  zeroAddress,
+} from 'viem';
 import { AGENTIC_APPS, AGENTIC_NETWORKS, NO_EXPIRY } from './agenticWallet.constants';
 import { functionSelector } from './agenticWallet.functions';
+import { fetchTokenInfo } from './agenticWallet.explorer';
 import { registry } from './agenticWallet.storage';
 import { AgenticNetwork, AgenticRule, RuleApp, RuleToken, RuleTokenRef } from './agenticWallet.types';
-import { getApp, getNetwork } from './agenticWallet.utils';
+import { getApp, getNetwork, isSolanaNetwork } from './agenticWallet.utils';
 
 /*
  * Translation between the rule screens and the AGW SDK (`client.agentic`).
@@ -42,6 +64,19 @@ export const getNetworkTokens = (networkId: string): RuleTokenRef[] => {
 const findToken = (networkId: string, address: string) =>
   getNetworkTokens(networkId).find((t) => t.address.toLowerCase() === address.toLowerCase());
 
+/**
+ * Makes tokens the SDK names by address alone (preset defaults such as Circle USDC or
+ * Aave faucet tokens) known by symbol and decimals: looked up on the explorer or the
+ * chain, then kept with the owner's custom tokens. Tokens that can't be resolved stay
+ * unknown, so their limits are never read with guessed decimals.
+ */
+export const resolveTokens = async (networkId: string, addresses: string[]) => {
+  const network = getNetwork(networkId);
+  const unknown = [...new Set(addresses.map((a) => a.toLowerCase()))].filter((a) => !findToken(networkId, a));
+  const found = await Promise.all(unknown.map((address) => fetchTokenInfo(network, address)));
+  found.forEach((token) => token && registry.saveToken(networkId, token));
+};
+
 /** The first stablecoin the chain moves, so a new rule starts with something sensible. */
 export const defaultToken = (networkId: string): RuleTokenRef | null => {
   const tokens = getNetworkTokens(networkId);
@@ -67,7 +102,7 @@ const appTarget = (ruleApp: RuleApp, network: AgenticNetwork) => {
       `${app?.name ?? 'This app'} has no contract configured on ${network.name} yet. Add it as a custom contract instead.`,
     );
   }
-  return getAddress(contract);
+  return (network.vm === 'svm' ? contract : getAddress(contract)) as `0x${string}`;
 };
 
 const appSignatures = (ruleApp: RuleApp) => {
@@ -139,6 +174,35 @@ const presetCompiler = (network: AgenticNetwork, assets: Rule['assets']) => {
   };
 };
 
+const U64_MAX = 2n ** 64n - 1n;
+
+/*
+ * Solana instructions from the listed programs, with the account pins the list gives
+ * (where the wallet sits in each instruction). An instruction that moves SOL also has
+ * its amount argument capped at the rule's SOL per transaction limit: Solana has no
+ * per-call value cap, and token limits only meter what is sent from Push.
+ */
+const solanaCalls = (rule: AgenticRule, network: AgenticNetwork, assets: Rule['assets'] = []): AllowedCall[] => {
+  const sol = assets.find((asset) => (typeof asset.token === 'string' ? asset.token : asset.token.address) === zeroAddress);
+  return rule.apps.flatMap((ruleApp) => {
+    const app = getApp(ruleApp.appId);
+    if (!app || ruleApp.customContract || ruleApp.customFunctions?.length) {
+      throw new AgenticInputError(`Only listed apps can be used on ${network.name} for now.`);
+    }
+    const target = appTarget(ruleApp, network);
+    return ruleApp.functionIds.map((id) => {
+      const fn = app.functions.find((f) => f.id === id);
+      if (!fn?.signature) throw new AgenticInputError(`"${fn?.label ?? id}" on ${app.name} has no instruction configured yet.`);
+      const pins: Pin[] = [...(fn.pins ?? [])];
+      if (fn.amountArg !== undefined) {
+        if (!sol) throw new AgenticInputError(`${fn.label} on ${app.name} needs SOL in Allowed Tokens to cap its amount.`);
+        pins.push({ arg: fn.amountArg, max: sol.maxPerCall > U64_MAX ? U64_MAX : sol.maxPerCall });
+      }
+      return { target, selector: fn.signature as AllowedCall['selector'], pins } as AllowedCall;
+    });
+  });
+};
+
 export const toSdkRule = (rule: AgenticRule): Rule => {
   const network = getNetwork(rule.networkId);
   const tokens = moveableTokens(network);
@@ -148,14 +212,17 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
     const { address, decimals, symbol } = row.token;
     const sdkToken = tokens.find((t) => t.address.toLowerCase() === address.toLowerCase());
     return {
-      token: sdkToken ?? (getAddress(address) as `0x${string}`),
+      // Solana tokens are base58 mints; only the SDK's moveable tokens are offered there.
+      token: sdkToken ?? (isSolanaNetwork(rule.networkId) ? address : (getAddress(address) as `0x${string}`)),
       maxPerCall: parseAmount(row.perTxLimit, decimals, `${symbol} per transaction limit`) ?? maxUint256,
       maxTotal: parseAmount(row.totalLimit, decimals, `${symbol} total spend limit`) ?? maxUint256,
     };
   });
 
   const compilePreset = presetCompiler(network, assets);
-  const allowedCalls: AllowedCall[] = rule.apps.flatMap((ruleApp) => {
+  const allowedCalls: AllowedCall[] = isSolanaNetwork(rule.networkId)
+    ? solanaCalls(rule, network, assets)
+    : rule.apps.flatMap((ruleApp) => {
     const target = appTarget(ruleApp, network);
     const app = getApp(ruleApp.appId);
     return appSignatures(ruleApp).flatMap((selector): AllowedCall[] => {
@@ -165,7 +232,7 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
       const pins = ruleApp.pins?.[selectorKey(selector) ?? ''];
       return [{ target, selector: selector as AllowedCall['selector'], ...(pins?.length ? { pins } : {}) }];
     });
-  });
+      });
   if (!allowedCalls.length) throw new AgenticInputError('Add at least one app function.');
   if (allowedCalls.length > 32) throw new AgenticInputError('A rule can allow at most 32 app functions.');
 
@@ -180,7 +247,7 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
 
   return {
     agent: getAddress(rule.agentAddress) as `0x${string}`,
-    chainNamespace: network.chain as `eip155:${string}`,
+    chainNamespace: network.chain as ForeignChainNamespace,
     assets,
     maxGasPerCall,
     validUntil,
@@ -230,9 +297,58 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
   });
 };
 
+/* An Anchor instruction's discriminator: sha256("global:<snake_case name>"), first 8 bytes. */
+const instructionDiscriminator = (signature: string) => {
+  const name = signature.split('(')[0].replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return sha256(toHex(`global:${name}`)).slice(0, 18);
+};
+
+/*
+ * A Solana rule comes back in its stored form: program keys and instruction
+ * discriminators, no names. It is shown (and can be edited) only when every instruction
+ * is one the listed programs know; an edit regenerates the same pins from that list.
+ * Anything else stays unsupported, so its raw constraints are never rewritten.
+ */
+const fromSolanaRecord = (record: RulesRecord, rule: DecodedSolanaRule, network: AgenticNetwork): AgenticRule | null => {
+  const apps = new Map<string, string[]>();
+  for (const program of rule.programs) {
+    let programId: string;
+    try {
+      programId = new PublicKey(hexToBytes(program.program)).toBase58();
+    } catch {
+      return null;
+    }
+    const app = AGENTIC_APPS.find((a) => a.contracts?.[network.id] === programId);
+    const discriminator = program.discriminator.slice(0, 2 + program.discriminatorLen * 2).toLowerCase();
+    const fn = app?.functions.find((f) => f.signature && instructionDiscriminator(f.signature) === discriminator);
+    if (!app || !fn) return null;
+    apps.set(app.id, [...(apps.get(app.id) ?? []), fn.id]);
+  }
+
+  const tokens: RuleToken[] = rule.assets
+    .filter((asset) => !(asset.maxPerCall === 0n && asset.maxTotal === 0n))
+    .map((asset) => {
+      const token = findToken(network.id, asset.token) ?? { address: asset.token, symbol: `${asset.token.slice(0, 6)}…`, decimals: 9 };
+      return { token, totalLimit: formatLimit(asset.maxTotal, token.decimals), perTxLimit: formatLimit(asset.maxPerCall, token.decimals) };
+    });
+
+  return {
+    id: record.rulesId,
+    rulesId: record.rulesId,
+    networkId: network.id,
+    apps: [...apps.entries()].map(([appId, functionIds]) => ({ appId, functionIds })),
+    tokens,
+    maxGasPerCall: formatEther(rule.maxGasPerCall),
+    agentAddress: record.agent,
+    durationDays: durationFromValidUntil(record.validUntil),
+    validUntil: record.validUntil,
+  };
+};
+
 /** A granted rule as the screens show it, or null for rule kinds the screens do not support yet. */
 export const fromRulesRecord = (record: RulesRecord): AgenticRule | null => {
   const network = AGENTIC_NETWORKS.find((n) => n.chain === record.chainNamespace);
+  if (network?.vm === 'svm' && 'format' in record.rule) return fromSolanaRecord(record, record.rule, network);
   const rule = record.rule as Rule;
   // Push-native rules (no chainNamespace) and decoded Solana layouts are not editable here yet.
   if (!network || !rule.chainNamespace || !Array.isArray(rule.allowedCalls) || !Array.isArray(rule.assets)) return null;
@@ -306,7 +422,11 @@ export const fromPresetTemplate = (
     maxGasPerCall:
       template.maxGasPerCall !== undefined ? formatEther(template.maxGasPerCall) : network.defaultGasPerCall,
     agentAddress: template.agent ?? '',
-    durationDays,
+    // The SDK's generated expiry (seven days for presets) wins over the caller's default.
+    durationDays:
+      template.validUntil !== undefined
+        ? String(Math.max(1, Math.ceil((template.validUntil - Date.now() / 1000) / DAY_SECONDS)))
+        : durationDays,
   };
 };
 

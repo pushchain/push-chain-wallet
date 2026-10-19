@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { getAddress, maxUint256 } from 'viem';
+import { describe, expect, it, vi } from 'vitest';
+import { getAddress, maxUint256, sha256, toHex } from 'viem';
+import { PublicKey } from '@solana/web3.js';
 import type { PresetRuleTemplate, Rule, RulesRecord } from '@pushchain/core';
 import { NO_EXPIRY } from './agenticWallet.constants';
 import { AgenticInputError, fromPresetTemplate, fromRulesRecord, getNetworkTokens, toSdkRule } from './agenticWallet.sdk';
@@ -13,13 +14,23 @@ import {
   isRuleStepTwoValid,
 } from './agenticWallet.utils';
 import { getAgenticPresets } from './agenticWallet.rules';
-import { getApp } from './agenticWallet.utils';
+import { getApp, getNetwork } from './agenticWallet.utils';
 
 const AGENT = getAddress('0x9cfa1c55e8b23fb4c2a3e2d55d0b1c7b0ae4ebdc');
 // A contract outside the catalog, used as a custom app
 const ROUTER = getAddress('0x1111111111111111111111111111111111111111');
 const UNISWAP_SEPOLIA = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E';
 const AAVE_USDC_SEPOLIA = '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8';
+const CIRCLE_USDC_SEPOLIA = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
+
+// Token lookups go to the explorer; answer them locally.
+vi.mock('./agenticWallet.explorer', () => ({
+  fetchTokenInfo: async (_network: unknown, address: string) =>
+    address.toLowerCase() === CIRCLE_USDC_SEPOLIA.toLowerCase()
+      ? { address: CIRCLE_USDC_SEPOLIA, symbol: 'USDC', decimals: 6 }
+      : null,
+  fetchContractInfo: async () => ({}),
+}));
 
 const usdc = () => getNetworkTokens('ethereum').find((t) => t.symbol === 'USDC')!;
 
@@ -156,22 +167,32 @@ describe('fromPresetTemplate', () => {
     rules.forEach((rule) => expect(rule.agentAddress).toBe(AGENT));
   });
 
-  it('needs tokens before a preset rule can be granted, then takes the SDK token pins', () => {
+  it('fills a preset with its default tokens and limits, looked up by address', async () => {
     const dex = getAgenticPresets().find((p) => p.key === 'DEXES')!;
+    await dex.resolveTokens();
     const sepolia = dex.buildRules(AGENT).find((rule) => rule.networkId === 'ethereum')!;
-    // No tokens: every swap would be capped at zero, so it is reported instead of granted.
-    expect(() => toSdkRule(sepolia)).toThrow(AgenticInputError);
+    const symbols = sepolia.tokens.map((row) => row.token?.symbol);
+    expect(symbols).toEqual(expect.arrayContaining(['WETH', 'USDC']));
+    // The default policy's 10 USDC per call / 100 total, read with USDC's 6 decimals
+    const usdcRow = sepolia.tokens.find((row) => row.token?.address.toLowerCase() === CIRCLE_USDC_SEPOLIA.toLowerCase())!;
+    expect(usdcRow).toMatchObject({ perTxLimit: '10', totalLimit: '100' });
 
-    const weth = getNetworkTokens('ethereum').find((t) => t.symbol === 'WETH')!;
-    const rule = toSdkRule({
-      ...sepolia,
-      tokens: [
-        { token: usdc(), totalLimit: '', perTxLimit: '100' },
-        { token: weth, totalLimit: '', perTxLimit: '1' },
-      ],
-    });
+    const rule = toSdkRule(sepolia);
     expect(rule.allowedCalls.length).toBeGreaterThan(0);
     rule.allowedCalls.forEach((call) => expect(call.pins?.length).toBeGreaterThan(1));
+  });
+
+  it('leaves a token it cannot look up unselected instead of guessing its decimals', () => {
+    const rule = fromPresetTemplate(
+      {
+        chainNamespace: 'eip155:11155111',
+        allowedCalls: [{ target: ROUTER, selector: 'multicall(bytes[])' }],
+        assets: [{ token: '0x2222222222222222222222222222222222222222', maxPerCall: 10n, maxTotal: 100n }],
+      } as PresetRuleTemplate,
+      'draft-x',
+      '7',
+    )!;
+    expect(rule.tokens[0].token).toBeNull();
   });
 });
 
@@ -319,5 +340,79 @@ describe('multiple tokens in one rule', () => {
     }));
     expect(isRuleStepTwoValid(draft({ tokens }))).toBe(false);
     expect(isRuleStepTwoValid(draft({ tokens: tokens.slice(0, 8) }))).toBe(true);
+  });
+});
+
+describe('Solana rules', () => {
+  const PROGRAM = '8yNqjrMnFiFbVTVQcKij8tNWWTMdFkrDf9abCGgc2sgx';
+  const sol = () => getNetworkTokens('solana').find((t) => t.symbol === 'SOL')!;
+  const solanaDraft = (overrides: Partial<AgenticRule> = {}) =>
+    draft({
+      networkId: 'solana',
+      apps: [{ appId: 'push-test-counter', functionIds: ['receive_sol(u64)', 'increment(u64)'] }],
+      tokens: [{ token: sol(), totalLimit: '1', perTxLimit: '0.01' }],
+      ...overrides,
+    });
+
+  it('sends listed instructions with the wallet account pin and a SOL amount cap', () => {
+    const rule = toSdkRule(solanaDraft());
+    expect(rule.chainNamespace).toMatch(/^solana:/);
+    expect(rule.assets).toEqual([expect.objectContaining({ maxPerCall: 10_000_000n, maxTotal: 1_000_000_000n })]);
+    expect(rule.allowedCalls).toEqual([
+      {
+        target: PROGRAM,
+        selector: 'receive_sol(u64)',
+        pins: [{ account: 2, expected: 'agentic:wallet' }, { arg: 0, max: 10_000_000n }],
+      },
+      { target: PROGRAM, selector: 'increment(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
+    ]);
+  });
+
+  it('needs SOL selected for an instruction that moves SOL', () => {
+    expect(() => toSdkRule(solanaDraft({ tokens: [] }))).toThrow(/Send SOL .* needs SOL/);
+    expect(() =>
+      toSdkRule(solanaDraft({ tokens: [], apps: [{ appId: 'push-test-counter', functionIds: ['increment(u64)'] }] })),
+    ).not.toThrow();
+  });
+
+  it('refuses custom programs on Solana', () => {
+    expect(() =>
+      toSdkRule(solanaDraft({ apps: [{ appId: null, functionIds: [], customContract: PROGRAM, customFunctions: ['x(u64)'] }] })),
+    ).toThrow(AgenticInputError);
+  });
+
+  it('reads a stored Solana rule back by program and discriminator', () => {
+    const programHex = `0x${Buffer.from(new PublicKey(PROGRAM).toBytes()).toString('hex')}` as `0x${string}`;
+    const discriminator = (name: string) => sha256(toHex(`global:${name}`)).slice(0, 18) as `0x${string}`;
+    const record = {
+      rulesId: '0xabc',
+      enabled: true,
+      chainNamespace: getNetwork('solana').chain,
+      agent: AGENT,
+      validUntil: NO_EXPIRY,
+      rule: {
+        format: 'decoded',
+        agent: AGENT,
+        chainNamespace: getNetwork('solana').chain,
+        validUntil: NO_EXPIRY,
+        maxGasPerCall: 100000000000000000n,
+        assets: [{ token: sol().address, maxPerCall: 10_000_000n, maxTotal: 1_000_000_000n }],
+        programs: [
+          { program: programHex, discriminator: discriminator('receive_sol'), discriminatorLen: 8, dataless: false, maxAccounts: 255 },
+        ],
+        pins: [],
+        dataPins: [],
+      },
+      spent: { kind: 'universal', assets: [] },
+    } as unknown as RulesRecord;
+    expect(fromRulesRecord(record)).toMatchObject({
+      networkId: 'solana',
+      apps: [{ appId: 'push-test-counter', functionIds: ['receive_sol(u64)'] }],
+      tokens: [{ token: { symbol: 'SOL' }, perTxLimit: '0.01', totalLimit: '1' }],
+      maxGasPerCall: '0.1',
+    });
+
+    const unknown = { ...record, rule: { ...(record.rule as object), programs: [{ ...(record.rule as { programs: object[] }).programs[0], discriminator: '0x0102030405060708' }] } };
+    expect(fromRulesRecord(unknown as RulesRecord)).toBeNull();
   });
 });
