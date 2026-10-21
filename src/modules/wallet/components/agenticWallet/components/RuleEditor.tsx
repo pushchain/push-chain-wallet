@@ -1,11 +1,10 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, ReactNode, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { getAddress } from 'viem';
 import { Add, OptOut } from 'blocks';
 import { CHAIN_LOGO, TOKEN_LOGO } from 'common';
 import { usePushChain } from '../../../../../context/PushChainContext';
 import { AGENTIC_NETWORKS, MAX_TOKENS_PER_RULE } from '../agenticWallet.constants';
-import { formatFunctionSignature } from '../agenticWallet.functions';
 import { defaultToken, getNetworkTokens } from '../agenticWallet.sdk';
 import { registry, useAgenticRegistry } from '../agenticWallet.storage';
 import { AgenticRule, RuleApp, RuleToken } from '../agenticWallet.types';
@@ -19,6 +18,8 @@ import {
   isRuleStepOneValid,
   isRuleStepThreeValid,
   isRuleStepTwoValid,
+  formatAppFunction,
+  formatCustomFunction,
   isEvmAddress,
   isSolanaNetwork,
   maskAddress,
@@ -167,6 +168,7 @@ const StepTwo: FC<{
 }> = ({ rule, ruleNumber, onChange, onNext }) => {
   const [tokenSheetFor, setTokenSheetFor] = useState<number | null>(null);
   useAgenticRegistry(); // re-render when a custom token is saved
+  useScrollToNewCard('token', rule.tokens.length);
 
   const duplicateToken = findDuplicateToken(rule.tokens);
   // The contracts allow 8 tokens per rule; there is also nothing left to add once every listed token is used.
@@ -243,11 +245,29 @@ type SheetState =
   | { kind: 'contract'; appIndex: number }
   | { kind: 'functions'; appIndex: number; editSignature?: string };
 
+/*
+ * "Add new app" / "Add new token" append a card below the fold; bring it into view. Only a
+ * growing count scrolls, so deleting a card or opening a saved rule leaves the position alone.
+ */
+const useScrollToNewCard = (kind: 'app' | 'token', count: number) => {
+  const previous = useRef(count);
+  useEffect(() => {
+    const grew = count > previous.current;
+    previous.current = count;
+    if (!grew) return;
+    requestAnimationFrame(() => {
+      const cards = document.querySelectorAll<HTMLElement>(`[data-rule-card="${kind}"]`);
+      cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [kind, count]);
+};
+
 const CUSTOM_APP_PREFIX = 'custom:';
 
 const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => void }> = ({ rule, onChange }) => {
   const network = getNetwork(rule.networkId);
   const solana = isSolanaNetwork(rule.networkId);
+  useScrollToNewCard('app', rule.apps.length);
   const registrySnapshot = useAgenticRegistry();
   const catalogApps = getAppsForNetwork(rule.networkId);
   // A saved custom contract that the catalog now covers (e.g. from the SDK) shows once, as the catalog app.
@@ -302,15 +322,24 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
           const savedFunctions = key ? registry.getFunctions(rule.networkId, key) : [];
           const selectedCustom = ruleApp.customFunctions ?? [];
 
+          const deselect = (signature: string) =>
+            updateApp(index, { ...ruleApp, customFunctions: selectedCustom.filter((s) => s !== signature) });
+
+          // Only functions the owner added can be edited; ones from the catalog, a preset or a granted rule cannot.
           const tags: FunctionTagItem[] = [
             ...(app?.functions ?? [])
               .filter((fn) => ruleApp.functionIds.includes(fn.id))
-              .map((fn) => ({ label: fn.label })),
+              .map((fn) => ({
+                label: formatAppFunction(fn),
+                onRemove: () =>
+                  updateApp(index, { ...ruleApp, functionIds: ruleApp.functionIds.filter((id) => id !== fn.id) }),
+              })),
             ...selectedCustom.map((signature) => ({
-              label: formatFunctionSignature(signature),
-              onEdit: () => setSheet({ kind: 'functions', appIndex: index, editSignature: signature }),
-              onRemove: () =>
-                updateApp(index, { ...ruleApp, customFunctions: selectedCustom.filter((s) => s !== signature) }),
+              label: formatCustomFunction(rule.networkId, ruleApp, signature),
+              ...(savedFunctions.includes(signature)
+                ? { onEdit: () => setSheet({ kind: 'functions', appIndex: index, editSignature: signature }) }
+                : {}),
+              onRemove: () => deselect(signature),
             })),
           ];
 
@@ -319,7 +348,7 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
             : ruleApp.appId;
 
           return (
-            <Card key={index} gap="var(--spacing-xxs)">
+            <Card key={index} gap="var(--spacing-xxs)" data-rule-card="app">
               <CardLabel
                 label={`App ${index + 1}`}
                 // An empty only card has nothing to delete (deleting would leave the same empty card).
@@ -388,11 +417,24 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
                       disabled={!hasRuleAppTarget(ruleApp)}
                       values={[...ruleApp.functionIds, ...selectedCustom]}
                       options={[
-                        ...(app?.functions ?? []).map((fn) => ({ value: fn.id, label: fn.label })),
+                        ...(app?.functions ?? []).map((fn) => ({ value: fn.id, label: formatAppFunction(fn) })),
+                        // Owner-added functions live in this browser's storage; the bin removes them there too.
                         ...savedFunctions.map((signature) => ({
                           value: signature,
-                          label: formatFunctionSignature(signature),
+                          label: formatCustomFunction(rule.networkId, ruleApp, signature),
+                          deleteLabel: 'Delete custom function',
+                          onDelete: () => {
+                            registry.removeFunction(rule.networkId, key, signature);
+                            deselect(signature);
+                          },
                         })),
+                        // Functions from a preset or a granted rule stay selectable, without a bin.
+                        ...selectedCustom
+                          .filter((signature) => !savedFunctions.includes(signature))
+                          .map((signature) => ({
+                            value: signature,
+                            label: formatCustomFunction(rule.networkId, ruleApp, signature),
+                          })),
                       ]}
                       onChange={(values) =>
                         updateApp(index, {
@@ -437,7 +479,7 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
         <CustomFunctionsSheet
           network={network}
           contractAddress={sheetApp.customContract ?? getApp(sheetApp.appId)?.contracts?.[rule.networkId]}
-          initialFunctions={sheet.editSignature ? [formatFunctionSignature(sheet.editSignature)] : ['']}
+          initialFunctions={sheet.editSignature ? [formatCustomFunction(rule.networkId, sheetApp, sheet.editSignature)] : ['']}
           editing={!!sheet.editSignature}
           onClose={() => setSheet(null)}
           onSubmit={(signatures) => {
@@ -478,7 +520,7 @@ type TokenCardProps = {
 const TokenCard: FC<TokenCardProps> = ({ index, row, usedElsewhere, networkId, onChange, onAddCustom, onRemove }) => {
   const tokens = getNetworkTokens(networkId).filter((t) => !usedElsewhere.includes(t.address.toLowerCase()));
   return (
-    <Card gap="var(--spacing-xxs)">
+    <Card gap="var(--spacing-xxs)" data-rule-card="token">
       <CardLabel
         label={`Token ${index + 1}`}
         menuItems={[{ key: 'delete', label: 'Delete Token', icon: <OptOut size={24} />, onSelect: onRemove }]}

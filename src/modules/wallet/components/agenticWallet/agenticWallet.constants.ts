@@ -1,7 +1,6 @@
 import { PushChain } from '@pushchain/core';
 import type { ForeignChainNamespace } from '@pushchain/core';
 import { getAddress } from 'viem';
-import { formatFunctionSignature } from './agenticWallet.functions';
 import { AgenticApp, AgenticNetwork } from './agenticWallet.types';
 
 const CHAIN = PushChain.CONSTANTS.CHAIN;
@@ -11,8 +10,10 @@ const CHAIN = PushChain.CONSTANTS.CHAIN;
  * are the matching testnets the AGW SDK supports. Solana (devnet) only offers listed
  * programs, since each instruction needs the wallet's account position (an account pin).
  *
- * defaultGasPerCall prefills "Max gas per call" (PC per outbound). TODO: placeholder
- * values until product confirms a per-chain default.
+ * defaultGasPerCall prefills "Max gas per call": the most PC an agent send may attach
+ * for destination gas (unused gas is refunded). The SDK attaches about $1 of PC per send
+ * (~10 PC on Donut today), so 20 PC is the backend's recommended prefill for every chain,
+ * Solana included; Solana rules must be above 0. BNB testnet can briefly need ~28 PC.
  */
 export const AGENTIC_NETWORKS: AgenticNetwork[] = [
   {
@@ -21,7 +22,7 @@ export const AGENTIC_NETWORKS: AgenticNetwork[] = [
     chain: CHAIN.ETHEREUM_SEPOLIA,
     chainId: 11155111,
     explorerApi: 'https://eth-sepolia.blockscout.com',
-    defaultGasPerCall: '0.1',
+    defaultGasPerCall: '20',
   },
   {
     id: 'base',
@@ -29,7 +30,7 @@ export const AGENTIC_NETWORKS: AgenticNetwork[] = [
     chain: CHAIN.BASE_SEPOLIA,
     chainId: 84532,
     explorerApi: 'https://base-sepolia.blockscout.com',
-    defaultGasPerCall: '0.1',
+    defaultGasPerCall: '20',
   },
   {
     id: 'arbitrum',
@@ -37,21 +38,21 @@ export const AGENTIC_NETWORKS: AgenticNetwork[] = [
     chain: CHAIN.ARBITRUM_SEPOLIA,
     chainId: 421614,
     explorerApi: 'https://arbitrum-sepolia.blockscout.com',
-    defaultGasPerCall: '0.1',
+    defaultGasPerCall: '20',
   },
   {
     id: 'bnb',
     name: 'BNB Chain',
     chain: CHAIN.BNB_TESTNET,
     chainId: 97,
-    defaultGasPerCall: '0.1',
+    defaultGasPerCall: '20',
   },
   {
     id: 'solana',
     name: 'Solana',
     chain: CHAIN.SOLANA_DEVNET,
     chainId: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
-    defaultGasPerCall: '0.1',
+    defaultGasPerCall: '20',
     vm: 'svm',
   },
 ];
@@ -230,7 +231,7 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
             app.functions.push({
               id: call.selector,
               // Labels of zero-cap review calls carry a hint, e.g. "Swap exact input (select two tokens to enable)".
-              label: call.label?.replace(/\s*\(select [^)]*\)$/, '') ?? formatFunctionSignature(call.selector),
+              label: call.label?.replace(/\s*\(select [^)]*\)$/, '') ?? call.selector.split('(')[0],
               signature: call.selector,
               ...(call.pins?.length ? { pins: call.pins } : {}),
               preset: preset.constant,
@@ -274,6 +275,22 @@ const SOLANA_APPS: AgenticApp[] = [
         amountArg: 0,
       },
       { id: 'unstake_sol(u64)', label: 'Unstake SOL', signature: 'unstake_sol(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
+    ],
+  },
+  /*
+   * SPL Memo v2, the backend's devnet test program: it has no Anchor IDL, so the rule allows
+   * memos starting with the fixed 8-byte prefix "PUSHAGW:" (a raw discriminator) and pins
+   * the wallet as the signing account. It tests a program call only; it moves no SOL or tokens.
+   * Agents sending to it first register a small IDL (PushChain.utils.svm.registerIdl).
+   */
+  {
+    id: 'spl-memo',
+    name: 'SPL Memo',
+    networks: ['solana'],
+    contracts: { solana: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr' },
+    functions: [
+      // accounts: cea_authority (signer)
+      { id: 'memo:PUSHAGW', label: 'Write memo (PUSHAGW: prefix)', signature: '0x505553484147573a', pins: [{ account: 0, expected: 'agentic:wallet' }] },
     ],
   },
 ];

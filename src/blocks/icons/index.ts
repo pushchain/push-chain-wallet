@@ -121,6 +121,7 @@ export { default as MegaPhone } from "./components/MegaPhone";
 
 export { default as Moon } from "./components/Moon";
 export { default as Sun } from "./components/Sun";
+export { default as Trash } from "./components/Trash";
 export { default as MoonFilled } from "./components/MoonFilled";
 
 export { default as NFTGated } from "./components/NFTGated";

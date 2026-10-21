@@ -203,11 +203,10 @@ const solanaCalls = (rule: AgenticRule, network: AgenticNetwork, assets: Rule['a
   });
 };
 
-export const toSdkRule = (rule: AgenticRule): Rule => {
-  const network = getNetwork(rule.networkId);
-  const tokens = moveableTokens(network);
-
-  const assets = rule.tokens.map((row, index) => {
+/* A rule's token rows as SDK assets: moveable tokens as the SDK's own objects, blank limits as unlimited. */
+const ruleAssets = (rule: AgenticRule): NonNullable<Rule['assets']> => {
+  const tokens = moveableTokens(getNetwork(rule.networkId));
+  return rule.tokens.map((row, index) => {
     if (!row.token) throw new AgenticInputError(`Token ${index + 1} is not selected.`);
     const { address, decimals, symbol } = row.token;
     const sdkToken = tokens.find((t) => t.address.toLowerCase() === address.toLowerCase());
@@ -218,6 +217,44 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
       maxTotal: parseAmount(row.totalLimit, decimals, `${symbol} total spend limit`) ?? maxUint256,
     };
   });
+};
+
+/*
+ * Why a preset rule cannot be created yet, from the SDK's readiness for its current
+ * tokens and limits (rechecked after every edit). Empty when it is ready, or when the
+ * rule did not come from a preset. Missing token routes are named by token and network.
+ */
+export const presetReadinessIssues = (rule: AgenticRule): string[] => {
+  if (!rule.preset) return [];
+  const network = getNetwork(rule.networkId);
+  try {
+    const chainNamespace = network.chain as ForeignChainNamespace;
+    const agent = /^0x[0-9a-fA-F]{40}$/.test(rule.agentAddress) ? (getAddress(rule.agentAddress) as `0x${string}`) : undefined;
+    const gas = rule.maxGasPerCall.trim() ? parseEther(rule.maxGasPerCall.replace(/,/g, '')) : undefined;
+    const { readiness } = PushChain.utils.agentic.presets.get(rule.preset, {
+      chainNamespace,
+      assets: ruleAssets(rule),
+      ...(agent ? { agent, validUntil: resolveValidUntil(rule) } : {}),
+      ...(gas !== undefined ? { maxGasPerCall: gas } : {}),
+    });
+    const chain = readiness.chains.find((c) => c.chainNamespace === chainNamespace);
+    const issues = (chain?.issues ?? []).map((issue) => {
+      if (issue.code === 'BRIDGE_ASSET_UNAVAILABLE' && issue.token) {
+        const symbol = findToken(network.id, issue.token)?.symbol ?? `${issue.token.slice(0, 6)}…`;
+        return `${symbol} can't be sent from Push to ${network.name} yet. Remove it or choose a token with a Push route.`;
+      }
+      // The agent field has its own validation; an empty one isn't reported twice.
+      return issue.code === 'AGENT_REQUIRED' ? '' : issue.message;
+    });
+    return [...new Set(issues.filter(Boolean))];
+  } catch (error) {
+    return [describeAgenticError(error)];
+  }
+};
+
+export const toSdkRule = (rule: AgenticRule): Rule => {
+  const network = getNetwork(rule.networkId);
+  const assets = ruleAssets(rule);
 
   const compilePreset = presetCompiler(network, assets);
   const allowedCalls: AllowedCall[] = isSolanaNetwork(rule.networkId)
@@ -233,6 +270,15 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
       return [{ target, selector: selector as AllowedCall['selector'], ...(pins?.length ? { pins } : {}) }];
     });
       });
+  // A function picked twice (or under two apps on one contract) must not grant its calls twice.
+  const seen = new Set<string>();
+  const uniqueCalls = allowedCalls.filter((call) => {
+    const key = JSON.stringify(call, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  allowedCalls.splice(0, allowedCalls.length, ...uniqueCalls);
   if (!allowedCalls.length) throw new AgenticInputError('Add at least one app function.');
   if (allowedCalls.length > 32) throw new AgenticInputError('A rule can allow at most 32 app functions.');
 
@@ -269,7 +315,11 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
   return Array.from(byTarget.entries()).map(([target, targetCalls]) => {
     const app = AGENTIC_APPS.find((a) => a.contracts?.[networkId]?.toLowerCase() === target);
     const known = (app?.functions ?? []).filter((f) => f.signature);
-    const customSignatures = registry.getFunctions(networkId, app?.id ?? target);
+    // Signatures known for this contract: saved under the app, or under its address before the app was listed.
+    const customSignatures = [
+      ...registry.getFunctions(networkId, app?.id ?? target),
+      ...(app ? registry.getFunctions(networkId, target) : []),
+    ];
 
     const functionIds: string[] = [];
     const customFunctions: string[] = [];
@@ -279,7 +329,9 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
       if (call.pins?.length) pins[selector] = call.pins;
       const catalogFn = known.find((f) => functionSelector(f.signature!)?.toLowerCase() === selector);
       if (catalogFn) {
-        functionIds.push(catalogFn.id);
+        // A preset sends one call per token direction for the same function; it is selected once
+        // and toSdkRule regenerates every direction from the rule's tokens.
+        if (!functionIds.includes(catalogFn.id)) functionIds.push(catalogFn.id);
         return;
       }
       // A full signature (from a preset) is kept; a stored 4-byte id is named from the registry when known.
@@ -287,7 +339,7 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
         ? call.selector
         : customSignatures.find((sig) => functionSelector(sig)?.toLowerCase() === selector);
       // Unknown selectors stay visible as their 4-byte id rather than being dropped.
-      customFunctions.push(custom ?? call.selector);
+      if (!customFunctions.includes(custom ?? call.selector)) customFunctions.push(custom ?? call.selector);
     });
 
     const extra = Object.keys(pins).length ? { pins } : {};
@@ -297,8 +349,10 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
   });
 };
 
-/* An Anchor instruction's discriminator: sha256("global:<snake_case name>"), first 8 bytes. */
+/* An Anchor instruction's discriminator: sha256("global:<snake_case name>"), first 8 bytes; raw ones as given. */
 const instructionDiscriminator = (signature: string) => {
+  // A raw eight-byte discriminator (e.g. a memo prefix) is already the stored form.
+  if (/^0x[0-9a-fA-F]{16}$/.test(signature)) return signature.toLowerCase();
   const name = signature.split('(')[0].replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
   return sha256(toHex(`global:${name}`)).slice(0, 18);
 };
@@ -398,7 +452,6 @@ export const fromPresetTemplate = (
     if (call.app && !inCatalog && !registry.getApp(network.id, call.target)) {
       registry.saveApp(network.id, { address: getAddress(call.target), name: call.app });
     }
-    if (call.selector.includes('(')) registry.saveFunctions(network.id, call.target, [call.selector]);
     const selector = selectorKey(call.selector);
     if (call.label && selector) registry.saveFunctionLabel(network.id, call.target, selector, call.label);
   });
@@ -433,6 +486,12 @@ export const fromPresetTemplate = (
 /** A message the owner can act on, from SDK, contract or input errors. */
 export const describeAgenticError = (error: unknown): string => {
   if (error instanceof AgenticInputError) return error.message;
+  // The SDK's own text for people (rule-numbered, no RPC or ABI detail); code/message/details stay for diagnostics.
+  const userMessage = (error as { userMessage?: unknown } | null)?.userMessage;
+  if ((error instanceof AgenticError || error instanceof AgenticRevertError) && typeof userMessage === 'string' && userMessage) {
+    if (/user rejected|denied/i.test((error as Error).message)) return 'The request was rejected in your wallet.';
+    return userMessage;
+  }
   if (error instanceof AgenticRevertError) {
     const decoded = (error as { decodedError?: { errorName?: string } }).decodedError?.errorName;
     return decoded ? `The contract rejected this change (${decoded}).` : error.message;

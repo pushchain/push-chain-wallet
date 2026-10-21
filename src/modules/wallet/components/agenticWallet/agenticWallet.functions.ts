@@ -3,7 +3,7 @@ import { parseAbiItem, toFunctionSelector, toFunctionSignature, type Abi, type A
 /*
  * Custom functions are stored as canonical Solidity signatures, e.g.
  * 'execute(bytes,bytes[],uint256)' — the form the AGW SDK takes as a selector — and
- * shown as 'execute bytes, bytes[], uint256'.
+ * shown as 'execute (bytes, bytes[], uint256)': the name, then its parameters.
  */
 
 /** Splits a parameter list on top-level commas, keeping tuple types intact. */
@@ -40,7 +40,8 @@ export const parseFunctionSignature = (input: string): string | null => {
       return item?.type === 'function' ? toFunctionSignature(item) : null;
     }
 
-    let candidate = text.replace(/;$/, '');
+    // Shown form: 'name (type, type)' — the name, a space, then the parameter list.
+    let candidate = text.replace(/;$/, '').replace(/^([A-Za-z_$][\w$]*)\s+\(/, '$1(');
     // Display form: 'name type, type' or 'name (tuple), type' — a name, then a space, then the
     // parameters. A bare name ('increment') takes no parameters.
     const display = candidate.match(/^([A-Za-z_$][\w$]*)(?:\s+(.*))?$/s);
@@ -55,15 +56,19 @@ export const parseFunctionSignature = (input: string): string | null => {
   }
 };
 
-/** 'execute(bytes,bytes[],uint256)' → 'execute bytes, bytes[], uint256' */
-export const formatFunctionSignature = (signature: string) => {
+/**
+ * 'execute(bytes,bytes[],uint256)' → 'execute (bytes, bytes[], uint256)'. A readable label
+ * (e.g. the SDK's "Supply") replaces the name; the parameters always follow. A bare
+ * 4-byte selector has no parameters to show and stays as it is.
+ */
+export const formatFunctionSignature = (signature: string, label?: string) => {
   const open = signature.indexOf('(');
-  if (open < 0 || !signature.endsWith(')')) return signature;
-  const name = signature.slice(0, open);
+  if (open < 0 || !signature.endsWith(')')) return label ?? signature;
+  const name = label ?? signature.slice(0, open);
   const params = splitTopLevel(signature.slice(open + 1, -1));
   // Space out tuple members too, so a long struct parameter wraps at its commas.
   const spaced = params.map((param) => param.replace(/,\s*/g, ', '));
-  return spaced.length ? `${name} ${spaced.join(', ')}` : name;
+  return `${name} (${spaced.join(', ')})`;
 };
 
 export const functionSelector = (signature: string): `0x${string}` | null => {

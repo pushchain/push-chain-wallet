@@ -145,7 +145,7 @@ export const CustomFunctionsSheet: FC<CustomFunctionsSheetProps> = ({
       return;
     }
     const existing = new Set(signatures);
-    const fresh = imported.filter((sig) => !existing.has(sig)).map(formatFunctionSignature);
+    const fresh = imported.filter((sig) => !existing.has(sig)).map((sig) => formatFunctionSignature(sig));
     setEntries((prev) => [...prev.filter((entry) => entry.trim()), ...fresh]);
     setImportState({ busy: false, message: `Imported ${fresh.length} functions from ${source}. Clear any the agent should not call.` });
   };

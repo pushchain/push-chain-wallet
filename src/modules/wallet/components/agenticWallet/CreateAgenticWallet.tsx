@@ -4,7 +4,7 @@ import { Add, CaretRight } from 'blocks';
 import { AText, Card, ErrorText, Footer, PrimaryButton, Screen, ScrollBody, SecondaryButton } from './AgenticWallet.styles';
 import { WALLET_NAME_MAX_LENGTH } from './agenticWallet.constants';
 import { AgenticPreset, createEmptyRule, getAgenticPresets } from './agenticWallet.rules';
-import { describeAgenticError } from './agenticWallet.sdk';
+import { describeAgenticError, presetReadinessIssues } from './agenticWallet.sdk';
 import { AgenticRule } from './agenticWallet.types';
 import { findAmbiguousRules, isEvmAddress } from './agenticWallet.utils';
 import { AgenticHeader } from './components/AgenticHeader';
@@ -120,6 +120,9 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
   };
 
   const ambiguity = findAmbiguousRules(rules);
+  // Preset rules wait for the SDK's readiness (e.g. a token without a Push route) before Create.
+  const readiness = useMemo(() => new Map(rules.map((rule) => [rule.id, presetReadinessIssues(rule)])), [rules]);
+  const notReady = [...readiness.values()].some((issues) => issues.length > 0);
 
   const handleCreate = async () => {
     setSubmitting(true);
@@ -256,6 +259,7 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
                 rules={rules}
                 onEditRule={(index) => startRule(rules[index], index)}
                 onDeleteRule={(index) => setRules((prev) => prev.filter((_, i) => i !== index))}
+                issuesFor={(rule) => readiness.get(rule.id) ?? []}
               />
               <SecondaryButton size="sm" type="button" onClick={() => startRule(createEmptyRule(), rules.length)}>
                 <Add size={16} />
@@ -264,8 +268,14 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
             </ReviewList>
           </ScrollBody>
           <Footer>
-            {(ambiguity || submitError) && <ErrorText>{ambiguity ?? submitError}</ErrorText>}
-            <PrimaryButton type="button" disabled={!rules.length || !!ambiguity || submitting} onClick={handleCreate}>
+            {(ambiguity || submitError || notReady) && (
+              <ErrorText>{ambiguity ?? submitError ?? 'Fix the issues shown on the rules above to create this wallet.'}</ErrorText>
+            )}
+            <PrimaryButton
+              type="button"
+              disabled={!rules.length || !!ambiguity || notReady || submitting}
+              onClick={handleCreate}
+            >
               {submitting ? 'Creating agentic wallet…' : 'Create agentic wallet'}
             </PrimaryButton>
           </Footer>

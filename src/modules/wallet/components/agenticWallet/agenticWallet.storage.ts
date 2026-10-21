@@ -75,6 +75,12 @@ export const registry = {
     write({ ...snapshot, functions: { ...snapshot.functions, [key]: Array.from(new Set(list)) } });
   },
 
+  removeFunction(networkId: string, appKey: string, signature: string) {
+    const key = functionKey(networkId, appKey);
+    const list = (snapshot.functions[key] ?? []).filter((sig) => sig !== signature);
+    write({ ...snapshot, functions: { ...snapshot.functions, [key]: list } });
+  },
+
   getFunctions(networkId: string, appKey: string) {
     return snapshot.functions[functionKey(networkId, appKey)] ?? [];
   },

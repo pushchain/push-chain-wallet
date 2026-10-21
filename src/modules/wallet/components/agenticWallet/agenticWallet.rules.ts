@@ -67,7 +67,7 @@ export const getAgenticPresets = (): AgenticPreset[] => {
             });
             return rules.flatMap((template) => {
               const rule = fromPresetTemplate(template, newDraftId(), DEFAULT_DURATION_DAYS);
-              return rule ? [rule] : [];
+              return rule ? [{ ...rule, preset: preset.constant }] : [];
             });
           }),
       },

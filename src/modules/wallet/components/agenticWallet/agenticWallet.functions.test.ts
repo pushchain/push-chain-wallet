@@ -37,12 +37,17 @@ describe('parseFunctionSignature', () => {
 });
 
 describe('formatFunctionSignature', () => {
-  it('shows "name type, type" as in the design', () => {
-    expect(formatFunctionSignature('execute(bytes,bytes[],uint256)')).toBe('execute bytes, bytes[], uint256');
+  it('shows "name (type, type)", with a readable label in place of the name', () => {
+    expect(formatFunctionSignature('execute(bytes,bytes[],uint256)')).toBe('execute (bytes, bytes[], uint256)');
     expect(formatFunctionSignature('exactInputSingle((address,uint24),uint256)')).toBe(
-      'exactInputSingle (address, uint24), uint256',
+      'exactInputSingle ((address, uint24), uint256)',
     );
-    expect(formatFunctionSignature('increment()')).toBe('increment');
+    expect(formatFunctionSignature('increment()')).toBe('increment ()');
+    expect(formatFunctionSignature('supply(address,uint256,address,uint16)', 'Supply')).toBe(
+      'Supply (address, uint256, address, uint16)',
+    );
+    // A stored 4-byte selector has no parameters to show
+    expect(formatFunctionSignature('0xdb006a75')).toBe('0xdb006a75');
   });
 
   it('round-trips through parse', () => {
@@ -50,6 +55,9 @@ describe('formatFunctionSignature', () => {
     expect(parseFunctionSignature(display)).toBe('execute(bytes,bytes[],uint256)');
     const tuple = 'exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))';
     expect(parseFunctionSignature(formatFunctionSignature(tuple))).toBe(tuple);
+    expect(parseFunctionSignature(formatFunctionSignature('increment()'))).toBe('increment()');
+    // The earlier "name type, type" form still parses
+    expect(parseFunctionSignature('execute bytes, bytes[], uint256')).toBe('execute(bytes,bytes[],uint256)');
   });
 });
 

@@ -5,7 +5,6 @@ import type { TooltipProps } from './Tooltip.types';
 import { getTooltipPositionalCSS } from './Tooltip.utils';
 import { tooltipCSSPropsKeys } from './Tooltip.constants';
 import { useIsVisible } from '../../common';
-import { textVariants } from '../text';
 
 const RadixTooltipContent = styled(RadixTooltip.Content).withConfig({
   shouldForwardProp: (prop) => !tooltipCSSPropsKeys.includes(prop as keyof TooltipProps),
@@ -13,13 +12,17 @@ const RadixTooltipContent = styled(RadixTooltip.Content).withConfig({
   /* Tooltip default styles */
   display: flex;
   flex-direction: column;
-  gap: var(--s1);
-  padding: var(--s2);
-  border-radius: var(--r3);
+  /* The wallet's spacing and radius tokens (the --s* / --r* scale is not defined here) */
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-xxs);
+  border-radius: var(--radius-xxs);
+  z-index: 1000;
   font-family: var(--pw-int-font-family);
   word-wrap: break-word;
-  color: var(--pw-int-text-primary-inverse);
-  background-color: var(--pw-int-bg-primary-inverse);
+  /* Tertiary surface with a tertiary stroke, so it stands out on the wallet's white cards in either theme */
+  color: var(--pw-int-text-secondary-color);
+  background-color: var(--pw-int-bg-tertiary-color);
+  border: 1px solid var(--pw-int-border-tertiary-color);
 
   /* Tooltip non-responsive styles */
   width: ${({ width }) => width};
@@ -32,22 +35,26 @@ const RadixTooltipContent = styled(RadixTooltip.Content).withConfig({
   ${(props) => props.css || ''};
 `;
 
+/*
+ * Type from Figma "Base Component/Tooltip" (Push Design Foundations 636:11158): title in
+ * Caption Small/Semibold (10/14), description in Caption/Regular (12/16). Fixed sizes, so
+ * the wallet's scaled body text sizes don't enlarge them. Colours are the wallet's
+ * secondary/tertiary text on a tertiary surface rather than the design's black.
+ */
 const StyledTitle = styled.span`
-  color: var(--pw-int-text-primary-inverse);
+  color: var(--pw-int-text-secondary-color);
   font-family: var(--pw-int-font-family);
-  font-size: ${textVariants['c-semibold'].fontSize};
-  font-style: ${textVariants['c-semibold'].fontStyle};
-  font-weight: ${textVariants['c-semibold'].fontWeight};
-  line-height: ${textVariants['c-semibold'].lineHeight};
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
 `;
 
 const StyledDescription = styled.span`
-  color: var(--pw-int-text-primary-inverse);
+  color: var(--pw-int-text-tertiary-color);
   font-family: var(--pw-int-font-family);
-  font-size: ${textVariants['c-regular'].fontSize};
-  font-style: ${textVariants['c-regular'].fontStyle};
-  font-weight: ${textVariants['c-regular'].fontWeight};
-  line-height: ${textVariants['c-regular'].lineHeight};
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
 `;
 
 const Tooltip: FC<TooltipProps> = ({

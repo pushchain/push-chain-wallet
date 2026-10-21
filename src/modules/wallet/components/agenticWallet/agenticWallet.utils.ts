@@ -1,7 +1,7 @@
 import { AGENTIC_APPS, AGENTIC_NETWORKS, MAX_TOKENS_PER_RULE, NO_EXPIRY } from './agenticWallet.constants';
 import { formatFunctionSignature, functionSelector } from './agenticWallet.functions';
 import { registry } from './agenticWallet.storage';
-import { AgenticRule, AgenticSortOption, AgenticWallet, RuleApp, RuleToken } from './agenticWallet.types';
+import { AgenticAppFunction, AgenticRule, AgenticSortOption, AgenticWallet, RuleApp, RuleToken } from './agenticWallet.types';
 
 export const maskAddress = (address: string) =>
   address && address.length > 10 ? `${address.slice(0, 5)}...${address.slice(-5)}` : address;
@@ -81,7 +81,18 @@ export const formatAllowedApps = (rule: AgenticRule) => {
 const selectorOf = (signature: string) =>
   /^0x[0-9a-fA-F]{8}$/.test(signature) ? signature : functionSelector(signature) ?? signature;
 
-/* Catalog labels, preset labels, and other custom functions in their "name type, type" form. */
+/* A catalog function as "Label (type, type)"; placeholder entries without a signature show their label. */
+export const formatAppFunction = (fn: AgenticAppFunction) =>
+  fn.signature ? formatFunctionSignature(fn.signature, fn.label) : fn.label;
+
+/* A custom function as "name (type, type)", named by a preset's saved label when there is one. */
+export const formatCustomFunction = (networkId: string, ruleApp: RuleApp, signature: string) => {
+  const contract = ruleApp.customContract ?? getApp(ruleApp.appId)?.contracts?.[networkId];
+  const label = contract ? registry.getFunctionLabel(networkId, contract, selectorOf(signature)) : undefined;
+  return formatFunctionSignature(signature, label || undefined);
+};
+
+/* Catalog labels, preset labels, and other custom functions, each as "name (type, type)". */
 export const getRuleFunctionLabels = (rule: AgenticRule) => {
   const labels: string[] = [];
   const add = (label?: string) => {
@@ -89,14 +100,11 @@ export const getRuleFunctionLabels = (rule: AgenticRule) => {
   };
   rule.apps.forEach((ruleApp) => {
     const app = getApp(ruleApp.appId);
-    ruleApp.functionIds.forEach((id) => add(app?.functions.find((fn) => fn.id === id)?.label));
-    const contract = ruleApp.customContract ?? app?.contracts?.[rule.networkId];
-    ruleApp.customFunctions?.forEach((sig) =>
-      add(
-        (contract && registry.getFunctionLabel(rule.networkId, contract, selectorOf(sig))) ||
-          formatFunctionSignature(sig),
-      ),
-    );
+    ruleApp.functionIds.forEach((id) => {
+      const fn = app?.functions.find((f) => f.id === id);
+      if (fn) add(formatAppFunction(fn));
+    });
+    ruleApp.customFunctions?.forEach((sig) => add(formatCustomFunction(rule.networkId, ruleApp, sig)));
   });
   return labels;
 };

@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getAddress, maxUint256, sha256, toHex } from 'viem';
 import { PublicKey } from '@solana/web3.js';
+import { PushChain } from '@pushchain/core';
 import type { PresetRuleTemplate, Rule, RulesRecord } from '@pushchain/core';
 import { NO_EXPIRY } from './agenticWallet.constants';
-import { AgenticInputError, fromPresetTemplate, fromRulesRecord, getNetworkTokens, toSdkRule } from './agenticWallet.sdk';
+import {
+  AgenticInputError,
+  fromPresetTemplate,
+  fromRulesRecord,
+  getNetworkTokens,
+  presetReadinessIssues,
+  toSdkRule,
+} from './agenticWallet.sdk';
 import { AgenticRule } from './agenticWallet.types';
 import {
   findAmbiguousRules,
@@ -22,12 +30,13 @@ const ROUTER = getAddress('0x1111111111111111111111111111111111111111');
 const UNISWAP_SEPOLIA = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E';
 const AAVE_USDC_SEPOLIA = '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8';
 const CIRCLE_USDC_SEPOLIA = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
+const CIRCLE_USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 
 // Token lookups go to the explorer; answer them locally.
 vi.mock('./agenticWallet.explorer', () => ({
   fetchTokenInfo: async (_network: unknown, address: string) =>
-    address.toLowerCase() === CIRCLE_USDC_SEPOLIA.toLowerCase()
-      ? { address: CIRCLE_USDC_SEPOLIA, symbol: 'USDC', decimals: 6 }
+    [CIRCLE_USDC_SEPOLIA, CIRCLE_USDC_BASE_SEPOLIA].find((a) => a.toLowerCase() === address.toLowerCase())
+      ? { address, symbol: 'USDC', decimals: 6 }
       : null,
   fetchContractInfo: async () => ({}),
 }));
@@ -156,7 +165,7 @@ describe('fromPresetTemplate', () => {
       '30',
     )!;
     expect(rule.tokens).toEqual([]);
-    expect(getRuleFunctionLabels(rule)).toEqual(['Batch']);
+    expect(getRuleFunctionLabels(rule)).toEqual(['Batch (bytes[])']);
   });
 
   it('builds a rule per supported network from the SDK catalog for an agent', () => {
@@ -180,6 +189,34 @@ describe('fromPresetTemplate', () => {
     const rule = toSdkRule(sepolia);
     expect(rule.allowedCalls.length).toBeGreaterThan(0);
     rule.allowedCalls.forEach((call) => expect(call.pins?.length).toBeGreaterThan(1));
+  });
+
+  it('sends a DEX preset with the same calls the SDK generates, none twice', async () => {
+    const dex = getAgenticPresets().find((p) => p.key === 'DEXES')!;
+    await dex.resolveTokens();
+    const sepolia = dex.buildRules(AGENT).find((rule) => rule.networkId === 'ethereum')!;
+    const ours = toSdkRule(sepolia).allowedCalls;
+    const sdk = PushChain.utils.agentic.presets.get('DEXES', { chainNamespace: 'eip155:11155111', agent: AGENT }).rules[0]
+      .allowedCalls;
+    const key = (c: { target: string; selector: string; pins?: unknown }) =>
+      JSON.stringify([c.target.toLowerCase(), c.selector, c.pins], (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+    expect(ours.map(key).sort()).toEqual(sdk.map(key).sort());
+  });
+
+  it("reports a preset rule's SDK readiness issues, naming tokens without a Push route", async () => {
+    const dex = getAgenticPresets().find((p) => p.key === 'DEXES')!;
+    await dex.resolveTokens();
+    const rules = dex.buildRules(AGENT);
+    const sepolia = rules.find((rule) => rule.networkId === 'ethereum')!;
+    const base = rules.find((rule) => rule.networkId === 'base')!;
+    expect(sepolia.preset).toBe('DEXES');
+    // Sepolia's WETH and Circle USDC both have Push routes (alpha.6); Base Sepolia's WETH does not.
+    expect(presetReadinessIssues(sepolia)).toEqual([]);
+    expect(presetReadinessIssues(base)).toEqual([
+      "WETH can't be sent from Push to Base yet. Remove it or choose a token with a Push route.",
+    ]);
+    // Rules not made from a preset have no readiness to wait for
+    expect(presetReadinessIssues(draft())).toEqual([]);
   });
 
   it('leaves a token it cannot look up unselected instead of guessing its decimals', () => {
@@ -366,6 +403,35 @@ describe('Solana rules', () => {
       },
       { target: PROGRAM, selector: 'increment(u64)', pins: [{ account: 1, expected: 'agentic:wallet' }] },
     ]);
+  });
+
+  it('allows SPL Memo by its raw PUSHAGW: prefix with the wallet as the signer, and reads it back', () => {
+    const MEMO = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+    const rule = toSdkRule(solanaDraft({ tokens: [], apps: [{ appId: 'spl-memo', functionIds: ['memo:PUSHAGW'] }] }));
+    expect(rule.allowedCalls).toEqual([
+      { target: MEMO, selector: '0x505553484147573a', pins: [{ account: 0, expected: 'agentic:wallet' }] },
+    ]);
+    const programHex = `0x${Buffer.from(new PublicKey(MEMO).toBytes()).toString('hex')}` as `0x${string}`;
+    const record = {
+      rulesId: '0xdef',
+      enabled: true,
+      chainNamespace: getNetwork('solana').chain,
+      agent: AGENT,
+      validUntil: NO_EXPIRY,
+      rule: {
+        format: 'decoded',
+        agent: AGENT,
+        chainNamespace: getNetwork('solana').chain,
+        validUntil: NO_EXPIRY,
+        maxGasPerCall: 20000000000000000000n,
+        assets: [],
+        programs: [{ program: programHex, discriminator: '0x505553484147573a', discriminatorLen: 8, dataless: false, maxAccounts: 255 }],
+        pins: [],
+        dataPins: [],
+      },
+      spent: { kind: 'universal', assets: [] },
+    } as unknown as RulesRecord;
+    expect(fromRulesRecord(record)).toMatchObject({ apps: [{ appId: 'spl-memo', functionIds: ['memo:PUSHAGW'] }], maxGasPerCall: '20' });
   });
 
   it('needs SOL selected for an instruction that moves SOL', () => {

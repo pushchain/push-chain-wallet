@@ -81,6 +81,8 @@ export type AgenticRule = {
   durationDays: string;
   /* On-chain expiry (unix seconds) for granted rules */
   validUntil?: number;
+  /* SDK preset a draft came from; Create waits until the SDK reports it ready */
+  preset?: PresetCategory;
 };
 
 export type AgenticWallet = {

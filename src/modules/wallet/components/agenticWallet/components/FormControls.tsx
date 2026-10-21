@@ -1,7 +1,7 @@
-import { FC, ReactElement, ReactNode, useState } from 'react';
+import { FC, ReactElement, ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import styled, { css } from 'styled-components';
 import * as RadixDropdown from '@radix-ui/react-dropdown-menu';
-import { Add, CaretDown, CaretUp, CopyFilled, Cross, Dropdown, DropdownProps, KebabMenuVertical, Pencil, TickCircleFilled } from 'blocks';
+import { Add, CaretDown, CaretUp, CopyFilled, Cross, Dropdown, DropdownProps, KebabMenuVertical, Pencil, TickCircleFilled, Tooltip, Trash } from 'blocks';
 import { handleCopy } from 'common';
 import { AText, agenticTokens } from '../AgenticWallet.styles';
 import { AgenticMenu, AgenticMenuItem } from './AgenticMenu';
@@ -369,6 +369,9 @@ export type SelectOption = {
   /* Contract under the app name, e.g. "0x9cf...4ebdc"; copyValue is the full address the copy icon copies */
   description?: string;
   copyValue?: string;
+  /* Removes an owner-added option from the saved list; shown as a bin on hover */
+  onDelete?: () => void;
+  deleteLabel?: string;
 };
 
 /* First row of a picker that opens a "custom" flow, e.g. "Add Custom Contract". */
@@ -521,6 +524,9 @@ export const MultiSelectField: FC<MultiSelectFieldProps> = ({
             >
               <Radio $checked={checked} aria-hidden="true" />
               <OptionLabel>{option.label}</OptionLabel>
+              {option.onDelete && (
+                <OptionDelete label={option.deleteLabel ?? `Delete ${option.label}`} onDelete={option.onDelete} />
+              )}
             </OptionItem>
           );
         })}
@@ -614,10 +620,30 @@ const OptionItem = styled(RadixDropdown.Item)<{ $selected?: boolean }>`
   }
 
   &:hover .option-copy,
-  &[data-highlighted] .option-copy {
+  &[data-highlighted] .option-copy,
+  &:hover .option-delete,
+  &[data-highlighted] .option-delete {
     visibility: visible;
   }
 `;
+
+/* Deletes an owner-added option without toggling it; like the copy icon, only on the highlighted row. */
+const OptionDelete: FC<{ label: string; onDelete: () => void }> = ({ label, onDelete }) => (
+  <DeleteButton
+    role="button"
+    aria-label={label}
+    className="option-delete"
+    onPointerDown={(event) => event.stopPropagation()}
+    onPointerUp={(event) => event.stopPropagation()}
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDelete();
+    }}
+  >
+    <Trash size={18} />
+  </DeleteButton>
+);
 
 /*
  * Copies an option's contract without choosing the option. Figma shows it on the
@@ -673,6 +699,28 @@ const CopyButton = styled.span`
 
   &:hover {
     color: var(--pw-int-icon-brand-color);
+  }
+`;
+
+const DeleteButton = styled.span`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  /* Same grey as the header's link and back icons, so it reads on the highlighted row */
+  color: var(--pw-int-text-tertiary-color);
+  visibility: hidden;
+
+  &:hover {
+    color: var(--pw-int-icon-danger-bold-color);
+  }
+
+  /* Devices without hover can't reveal it, so it stays visible there */
+  @media (hover: none) {
+    visibility: visible;
   }
 `;
 
@@ -767,8 +815,8 @@ const TextAreaBox = styled.label`
 
 /*
  * Figma "Tag" (State=Active, Size=SM) list for allowed functions. The rule editor
- * spaces the title 8px from the tags; the rule summary card uses 4px. Custom functions
- * can carry edit and remove actions.
+ * spaces the title 8px from the tags; the rule summary card uses 4px. In the editor every
+ * selected function can be removed; only the owner's custom ones can be edited.
  */
 export type FunctionTagItem = {
   label: string;
@@ -790,8 +838,8 @@ export const FunctionTags: FC<{ labels: (string | FunctionTagItem)[]; title?: st
         const item = typeof entry === 'string' ? { label: entry } : entry;
         const editable = !!(item.onEdit || item.onRemove);
         return (
-          <FunctionTag key={`${item.label}-${index}`} $editable={editable} title={item.label}>
-            <TagText>{item.label}</TagText>
+          <FunctionTag key={`${item.label}-${index}`} $editable={editable}>
+            <TagLabel label={item.label} />
             {item.onEdit && (
               <TagEditButton type="button" aria-label={`Edit ${item.label}`} onClick={item.onEdit}>
                 <Pencil size={12} />
@@ -808,6 +856,54 @@ export const FunctionTags: FC<{ labels: (string | FunctionTagItem)[]; title?: st
     </TagsWrap>
   </TagsColumn>
 );
+
+/* A tag's text; when it is cut off, the design system tooltip shows the full name. */
+const TagLabel: FC<{ label: string }> = ({ label }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let active = true;
+    const measure = () => active && setTruncated(el.scrollWidth > el.clientWidth);
+    // Measure now, after layout settles, once the web font has loaded (it changes the text
+    // width), and whenever the tag's box resizes.
+    measure();
+    const frame = requestAnimationFrame(measure);
+    document.fonts?.ready.then(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+    // Wrapping in the tooltip swaps the text element, so measuring restarts on the new one.
+  }, [label, truncated]);
+
+  const text = <TagText ref={ref}>{label}</TagText>;
+  return truncated ? (
+    // A compact single-line tooltip, sized for the small function tags
+    <Tooltip overlay={<TagTooltipText>{label}</TagTooltipText>} css={tagTooltipCss} tooltipPosition="bottom-right">
+      {text}
+    </Tooltip>
+  ) : (
+    text
+  );
+};
+
+const tagTooltipCss = css`
+  padding: var(--spacing-xxxs) 6px;
+`;
+
+const TagTooltipText = styled.span`
+  color: var(--pw-int-text-secondary-color);
+  font-family: var(--pw-int-font-family);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 12px;
+`;
 
 const TagText = styled.span`
   overflow: hidden;
