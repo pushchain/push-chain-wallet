@@ -179,6 +179,15 @@ const AgenticWalletsList: FC<AgenticWalletsListProps> = ({
             </AgenticMenu>
           </CountRow>
 
+          {error && (
+            <PartialError>
+              <ErrorText>{error}</ErrorText>
+              <SecondaryButton size="xs" type="button" onClick={() => void refresh()}>
+                Try again
+              </SecondaryButton>
+            </PartialError>
+          )}
+
           <WalletList>
             {sortedWallets.map((wallet) => (
               <WalletCard
@@ -510,4 +519,12 @@ const CopyButton = styled(IconButton)`
   &:hover {
     color: var(--pw-int-icon-brand-color);
   }
+`;
+
+/* Some wallets loaded and some didn't: the rest stay usable, with a retry for the missing ones. */
+const PartialError = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xxs);
 `;

@@ -59,6 +59,15 @@ export const registry = {
     write({ ...snapshot, apps: { ...snapshot.apps, [networkId]: [...apps, { ...app, address }] } });
   },
 
+  /* Forgets a custom contract and its saved functions; granted rules keep working (shown by address). */
+  removeApp(networkId: string, address: string) {
+    const key = address.toLowerCase();
+    const apps = (snapshot.apps[networkId] ?? []).filter((a) => a.address !== key);
+    const functions = { ...snapshot.functions };
+    delete functions[functionKey(networkId, key)];
+    write({ ...snapshot, apps: { ...snapshot.apps, [networkId]: apps }, functions });
+  },
+
   getApp(networkId: string, address: string) {
     return snapshot.apps[networkId]?.find((a) => a.address === address.toLowerCase());
   },

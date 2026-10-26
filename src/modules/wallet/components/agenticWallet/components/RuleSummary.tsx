@@ -12,8 +12,10 @@ import {
   getNetwork,
   getRuleFunctionLabels,
   groupRulesByNetwork,
+  isRuleAppEmpty,
   maskAddress,
 } from '../agenticWallet.utils';
+import { allTokenLimits } from '../agenticWallet.sdk';
 import { CardLabel, FunctionTags } from './FormControls';
 
 type RuleCardProps = {
@@ -21,16 +23,20 @@ type RuleCardProps = {
   index: number;
   onEdit?: () => void;
   onDelete?: () => void;
-  /* Why this rule can't be created yet (preset readiness), shown on the card itself */
-  issues?: string[];
 };
 
-const RuleCard: FC<RuleCardProps> = ({ rule, index, onEdit, onDelete, issues = [] }) => {
+const RuleCard: FC<RuleCardProps> = ({ rule, index, onEdit, onDelete }) => {
+  // A draft without tokens grants every token Push can send there, at the SDK's default limits; list them before signing.
+  const allTokens = !rule.rulesId && rule.tokens.length === 0 ? allTokenLimits(rule) : null;
+  const limits = (key: 'totalLimit' | 'perTxLimit') =>
+    allTokens ? `All tokens: ${formatTokenLimits(allTokens, key)}` : formatTokenLimits(rule.tokens, key);
+  const hasApps = rule.apps.some((ruleApp) => !isRuleAppEmpty(ruleApp));
   const rows = [
     { label: 'Delegated Agents Wallet', value: maskAddress(rule.agentAddress) || '—' },
-    { label: 'Allowed Apps', value: formatAllowedApps(rule) },
-    { label: 'Max total spend', value: formatTokenLimits(rule.tokens, 'totalLimit') },
-    { label: 'Max per call', value: formatTokenLimits(rule.tokens, 'perTxLimit') },
+    // Without apps, the agent may only send the rule's tokens back to the owner.
+    { label: 'Allowed Apps', value: hasApps ? formatAllowedApps(rule) : 'None (send tokens back to owner only)' },
+    { label: 'Max total spend', value: limits('totalLimit') },
+    { label: 'Max per call', value: limits('perTxLimit') },
     { label: 'Gas limit per call', value: formatGas(rule.maxGasPerCall) },
     { label: 'Expires in', value: formatExpiresIn(rule) },
   ];
@@ -69,24 +75,10 @@ const RuleCard: FC<RuleCardProps> = ({ rule, index, onEdit, onDelete, issues = [
           </FunctionsBlock>
         )}
       </Rows>
-      {issues.length > 0 && (
-        <Issues role="alert">
-          {issues.map((issue) => (
-            <AText key={issue} variant="caption-regular" color="var(--pw-int-text-danger-bold-color)">
-              {issue}
-            </AText>
-          ))}
-        </Issues>
-      )}
+
     </Card>
   );
 };
-
-const Issues = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xxxs);
-`;
 
 const Rows = styled.div`
   display: flex;
@@ -145,12 +137,10 @@ type RulesByNetworkProps = {
   rules: AgenticRule[];
   onEditRule?: (index: number) => void;
   onDeleteRule?: (index: number) => void;
-  /* Per-rule problems to show on its card, e.g. preset readiness on the review screen */
-  issuesFor?: (rule: AgenticRule) => string[];
 };
 
 /* Rules grouped under collapsible network headers; every group starts expanded. */
-export const RulesByNetwork: FC<RulesByNetworkProps> = ({ rules, onEditRule, onDeleteRule, issuesFor }) => {
+export const RulesByNetwork: FC<RulesByNetworkProps> = ({ rules, onEditRule, onDeleteRule }) => {
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const groups = groupRulesByNetwork(rules);
 
@@ -189,7 +179,6 @@ export const RulesByNetwork: FC<RulesByNetworkProps> = ({ rules, onEditRule, onD
                     index={index}
                     onEdit={onEditRule ? () => onEditRule(index) : undefined}
                     onDelete={onDeleteRule ? () => onDeleteRule(index) : undefined}
-                    issues={issuesFor?.(rule)}
                   />
                 ))}
               </Cards>

@@ -448,6 +448,9 @@ export const SelectField: FC<SelectFieldProps> = ({
               ) : (
                 <OptionLabel>{option.label}</OptionLabel>
               )}
+              {option.onDelete && (
+                <OptionDelete label={option.deleteLabel ?? `Delete ${option.label}`} onDelete={option.onDelete} />
+              )}
             </OptionItem>
           ))}
         </OptionsList>

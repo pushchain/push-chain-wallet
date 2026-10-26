@@ -1,7 +1,7 @@
 import { AGENTIC_APPS, AGENTIC_NETWORKS, MAX_TOKENS_PER_RULE, NO_EXPIRY } from './agenticWallet.constants';
 import { formatFunctionSignature, functionSelector } from './agenticWallet.functions';
 import { registry } from './agenticWallet.storage';
-import { AgenticAppFunction, AgenticRule, AgenticSortOption, AgenticWallet, RuleApp, RuleToken } from './agenticWallet.types';
+import { AgenticAppFunction, AgenticRule, AgenticSortOption, AgenticWallet, RuleApp, RuleToken, RuleTokenRef } from './agenticWallet.types';
 
 export const maskAddress = (address: string) =>
   address && address.length > 10 ? `${address.slice(0, 5)}...${address.slice(-5)}` : address;
@@ -42,12 +42,16 @@ export const UNLIMITED = '∞';
 
 /* "1,000 USDC · 1 ETH", as in the design; a blank limit is unlimited, shown as "∞ USDC". */
 export const formatTokenLimits = (tokens: RuleToken[], key: 'totalLimit' | 'perTxLimit') => {
-  const parts = tokens
-    .filter((row) => row.token)
-    .map((row) => {
-      const amount = formatAmount(row[key]);
-      return amount ? `${amount} ${row.token!.symbol}` : `${UNLIMITED} ${row.token!.symbol}`;
-    });
+  const rows = tokens.filter((row) => row.token);
+  // Two tokens can share a symbol (Push's USDC and Circle's USDC); tell them apart by address.
+  const symbolOf = (token: RuleTokenRef) =>
+    rows.filter((row) => row.token!.symbol === token.symbol).length > 1 && !token.symbol.includes('(')
+      ? `${token.symbol} (${token.address.slice(0, 6)}…)`
+      : token.symbol;
+  const parts = rows.map((row) => {
+    const amount = formatAmount(row[key]);
+    return `${amount || UNLIMITED} ${symbolOf(row.token!)}`;
+  });
   // A rule without tokens (e.g. a preset before tokens are chosen) can move none.
   return parts.length ? parts.join(' · ') : '—';
 };
@@ -132,10 +136,22 @@ export const formatExpiresIn = (rule: AgenticRule) => {
   return plural(days, 'day');
 };
 
-export const isRuleStepOneValid = (rule: AgenticRule) =>
-  !!rule.networkId &&
-  rule.apps.length > 0 &&
-  rule.apps.every((ruleApp) => hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) > 0);
+/* A rule's apps as a comparable string (pins carry bigint limits), to tell whether a preset draft was edited. */
+export const ruleAppsKey = (apps: RuleApp[]) =>
+  JSON.stringify(apps, (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+
+/* An app card with nothing chosen yet; it is ignored, since apps are optional on EVM networks. */
+export const isRuleAppEmpty = (ruleApp: RuleApp) => !hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) === 0;
+
+/* Every app that's started must be complete; EVM rules may have none (tokens only), Solana rules need one. */
+export const isRuleStepOneValid = (rule: AgenticRule) => {
+  const apps = rule.apps.filter((ruleApp) => !isRuleAppEmpty(ruleApp));
+  return (
+    !!rule.networkId &&
+    apps.every((ruleApp) => hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) > 0) &&
+    (!isSolanaNetwork(rule.networkId) || apps.length > 0)
+  );
+};
 
 const isValidLimit = (value: string) => !value.trim() || Number(value.replace(/,/g, '')) > 0;
 
@@ -179,7 +195,9 @@ export const groupRulesByNetwork = (rules: AgenticRule[]) => {
     }
     group.rules.push({ rule, index });
   });
-  return groups;
+  // A fixed network order, so groups don't move around when an update reorders the rules.
+  const order = (networkId: string) => AGENTIC_NETWORKS.findIndex((network) => network.id === networkId);
+  return groups.sort((a, b) => order(a.networkId) - order(b.networkId));
 };
 
 export const sortWallets = (wallets: AgenticWallet[], sort: AgenticSortOption) => {

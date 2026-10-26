@@ -73,6 +73,16 @@ const ProgressToast: FC = () => {
     setExpanded(false);
   }, [event?.id]);
 
+  // A finished operation clears itself, so its "Done" doesn't sit on screen into the next one.
+  // Failures stay until dismissed.
+  useEffect(() => {
+    if (!event || !(SUCCESS_IDS.includes(event.id) || event.level === "SUCCESS")) return;
+    const timer = setTimeout(() => {
+      if (progressStore.get()?.event === event) progressStore.set(null);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [event]);
+
   useLayoutEffect(() => {
     const el = textRef.current;
     setOverflowing(!!el && el.scrollWidth > el.clientWidth);

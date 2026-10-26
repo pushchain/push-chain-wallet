@@ -66,11 +66,12 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const { data: balance, isLoading: isBalanceLoading } = useWalletOperations(wallet.address);
   const { createAgenticClient } = usePushChain();
-  // Start the agentic client as the page opens, so the Tokens and Sub-Accounts tabs are ready.
+  // Start the agentic client once the rules have loaded (so the two don't hit the RPC at the same
+  // moment), ready for the Tokens and Sub-Accounts tabs. It's created once per wallet and cached.
   useEffect(() => {
-    createAgenticClient(wallet.address).catch(() => undefined);
+    if (wallet.rulesLoaded) createAgenticClient(wallet.address).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet.address]);
+  }, [wallet.address, wallet.rulesLoaded]);
   const balanceValue = Number(balance ?? 0);
   // Until the first balance arrives, show the home page's spinner, not the "Fund your wallet" card.
   const hasFunds = isBalanceLoading || balanceValue > 0;
@@ -172,7 +173,11 @@ const AgenticWalletDetails: FC<AgenticWalletDetailsProps> = ({
                   {`${wallet.unsupportedRules} more ${wallet.unsupportedRules === 1 ? 'rule is' : 'rules are'} active on this wallet but can't be shown here yet.`}
                 </AText>
               )}
-              {wallet.rules.length === 0 && wallet.unsupportedRules === 0 ? (
+              {!wallet.rulesLoaded ? (
+                <RulesSpinner>
+                  <Spinner size="medium" variant="primary" />
+                </RulesSpinner>
+              ) : wallet.rules.length === 0 && wallet.unsupportedRules === 0 ? (
                 /* Figma "Agentic Wallet Inside (No Rules)" */
                 <NoRules>
                   <AText variant="heading-5" align="center">
@@ -345,6 +350,13 @@ const NoRules = styled.div`
 `;
 
 const EmptyTabBox = styled.div`
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-lg) 0;
+`;
+
+/* While the wallet's rules are read (on first open) */
+const RulesSpinner = styled.div`
   display: flex;
   justify-content: center;
   padding: var(--spacing-lg) 0;

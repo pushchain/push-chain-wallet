@@ -51,6 +51,8 @@ export type RuleApp = {
    * rule or a preset and are sent back unchanged, so an edit never loosens a call.
    */
   pins?: Record<string, Pin[]>;
+  /* Native value cap per function (e.g. WETH deposit), keyed like pins; kept so an edit never drops it */
+  maxValues?: Record<string, bigint>;
 };
 
 export type RuleTokenRef = {
@@ -81,8 +83,10 @@ export type AgenticRule = {
   durationDays: string;
   /* On-chain expiry (unix seconds) for granted rules */
   validUntil?: number;
-  /* SDK preset a draft came from; Create waits until the SDK reports it ready */
+  /* SDK preset a draft came from; while its apps are unchanged it is regenerated from the preset */
   preset?: PresetCategory;
+  /* The preset's apps as generated, to tell whether the owner changed them */
+  presetApps?: string;
 };
 
 export type AgenticWallet = {
@@ -96,6 +100,8 @@ export type AgenticWallet = {
   rules: AgenticRule[];
   /* Rules the UI cannot show yet (Push-native or Solana), counted so nothing is hidden silently */
   unsupportedRules: number;
+  /* Rules are read only when the wallet is opened (many RPC calls each); until then rules is [] */
+  rulesLoaded: boolean;
 };
 
 export type AgenticSortOption = 'recent' | 'alphabetical';

@@ -68,7 +68,8 @@ export const formatFunctionSignature = (signature: string, label?: string) => {
   const params = splitTopLevel(signature.slice(open + 1, -1));
   // Space out tuple members too, so a long struct parameter wraps at its commas.
   const spaced = params.map((param) => param.replace(/,\s*/g, ', '));
-  return `${name} (${spaced.join(', ')})`;
+  // A function without parameters is just its name ("Wrap ETH", not "Wrap ETH ()").
+  return spaced.length ? `${name} (${spaced.join(', ')})` : name;
 };
 
 export const functionSelector = (signature: string): `0x${string}` | null => {

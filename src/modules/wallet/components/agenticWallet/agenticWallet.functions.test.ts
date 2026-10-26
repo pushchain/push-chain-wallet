@@ -42,7 +42,7 @@ describe('formatFunctionSignature', () => {
     expect(formatFunctionSignature('exactInputSingle((address,uint24),uint256)')).toBe(
       'exactInputSingle ((address, uint24), uint256)',
     );
-    expect(formatFunctionSignature('increment()')).toBe('increment ()');
+    expect(formatFunctionSignature('increment()')).toBe('increment');
     expect(formatFunctionSignature('supply(address,uint256,address,uint16)', 'Supply')).toBe(
       'Supply (address, uint256, address, uint16)',
     );

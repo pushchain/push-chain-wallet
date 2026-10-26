@@ -4,7 +4,7 @@ import { getAddress } from 'viem';
 import { AGENTIC_NETWORKS } from './agenticWallet.constants';
 import { defaultToken, fromPresetTemplate, resolveTokens } from './agenticWallet.sdk';
 import { AgenticRule } from './agenticWallet.types';
-import { getNetwork } from './agenticWallet.utils';
+import { getNetwork, ruleAppsKey } from './agenticWallet.utils';
 
 const DEFAULT_NETWORK = 'ethereum';
 const DEFAULT_DURATION_DAYS = '30';
@@ -67,7 +67,7 @@ export const getAgenticPresets = (): AgenticPreset[] => {
             });
             return rules.flatMap((template) => {
               const rule = fromPresetTemplate(template, newDraftId(), DEFAULT_DURATION_DAYS);
-              return rule ? [{ ...rule, preset: preset.constant }] : [];
+              return rule ? [{ ...rule, preset: preset.constant, presetApps: ruleAppsKey(rule.apps) }] : [];
             });
           }),
       },

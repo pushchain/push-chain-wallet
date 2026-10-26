@@ -1,5 +1,7 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import styled from 'styled-components';
+import { Spinner } from 'blocks';
 import AddTokens from '../AddTokens';
 import { usePushChain } from '../../../../context/PushChainContext';
 import { useWalletDashboard } from '../../../../context/WalletDashboardContext';
@@ -33,8 +35,15 @@ type View =
 const AgenticWallets: FC = () => {
   const { setActiveState } = useWalletDashboard();
   const { executorAddress } = usePushChain();
-  const { wallets, revokeRule } = useAgenticWallets();
+  const { wallets, revokeRule, ensureLoaded, loadRules } = useAgenticWallets();
   const [view, setView] = useState<View>({ name: 'list' });
+  // The wallets are read when these screens open (cached afterwards), not with the home dashboard.
+  useEffect(ensureLoaded, [ensureLoaded]);
+  // A wallet's rules are read when it's opened, from the list or its editor.
+  const openAddress = 'address' in view ? view.address : undefined;
+  useEffect(() => {
+    if (openAddress) loadRules(openAddress as `0x${string}`);
+  }, [openAddress, loadRules]);
   const queryClient = useQueryClient();
 
   const closeToDashboard = () => setActiveState('walletDashboard');
@@ -63,8 +72,12 @@ const AgenticWallets: FC = () => {
     else if (state === 'receive') setView({ name: 'receive', address, returnTo: 'details' });
     else if (state === 'addTokens') setView({ name: 'addTokens', address });
     else {
-      // Back from a send, swap or token change: show fresh balances instead of the up-to-15s-old poll.
-      void queryClient.invalidateQueries();
+      // Back from a send, swap or token change: show this wallet's fresh balances instead of the
+      // up-to-15s-old poll. Only its own queries; refetching every query at once bursts the RPC.
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey.some((part) => typeof part === 'string' && part.toLowerCase() === address.toLowerCase()),
+      });
       setView({ name: 'details', address });
     }
   };
@@ -111,6 +124,11 @@ const AgenticWallets: FC = () => {
     );
   }
 
+  // The editor starts from the wallet's rules, so it waits for them.
+  if (view.name === 'edit' && wallet && !wallet.rulesLoaded) {
+    return <RulesLoading />;
+  }
+
   if (view.name === 'edit' && wallet) {
     return (
       <EditAgenticRules
@@ -138,3 +156,18 @@ const AgenticWallets: FC = () => {
 };
 
 export { AgenticWallets };
+
+const RulesLoading: FC = () => (
+  <LoadingScreen>
+    <Spinner size="medium" variant="primary" />
+  </LoadingScreen>
+);
+
+const LoadingScreen = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+`;

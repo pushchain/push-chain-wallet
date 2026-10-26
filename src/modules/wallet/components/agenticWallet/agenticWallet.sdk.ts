@@ -29,7 +29,7 @@ import { functionSelector } from './agenticWallet.functions';
 import { fetchTokenInfo } from './agenticWallet.explorer';
 import { registry } from './agenticWallet.storage';
 import { AgenticNetwork, AgenticRule, RuleApp, RuleToken, RuleTokenRef } from './agenticWallet.types';
-import { getApp, getNetwork, isSolanaNetwork } from './agenticWallet.utils';
+import { getApp, getNetwork, isRuleAppEmpty, isSolanaNetwork, ruleAppsKey } from './agenticWallet.utils';
 
 /*
  * Translation between the rule screens and the AGW SDK (`client.agentic`).
@@ -144,33 +144,29 @@ const selectorKey = (signature: string) =>
   /^0x[0-9a-fA-F]{8}$/.test(signature) ? signature.toLowerCase() : functionSelector(signature)?.toLowerCase();
 
 /*
- * Calls for catalog functions, as `presets.get` generates them for the rule's tokens. The
- * SDK pins the token argument to each selected token and caps the amount at its per
- * transaction limit, so a function whose token isn't selected would move nothing (or is
- * left out); those are reported instead of being granted silently.
+ * Calls for catalog functions, as `presets.get` generates them. Presets send only ETH
+ * from Push (any other token throws), so a rule's own ETH limits set the caps when it has
+ * an ETH token; otherwise the preset's default ETH limits do. The calls keep the preset's
+ * pins (the app's own WETH, the wallet as beneficiary), whatever else the rule allows.
  */
-const presetCompiler = (network: AgenticNetwork, assets: Rule['assets']) => {
-  const generated = new Map<PresetCategory, { calls: AllowedCall[]; disabled: string[] }>();
+const presetCompiler = (network: AgenticNetwork, assets: NonNullable<Rule['assets']>) => {
+  const generated = new Map<PresetCategory, AllowedCall[]>();
   const key = (target: string, selector: string) => `${target.toLowerCase()}:${selector}`;
+  const eth = assets.find((asset) => isNativeAsset(asset) && asset.maxPerCall > 0n && (asset.maxTotal ?? 0n) > 0n);
 
   return (preset: PresetCategory, target: string, selector: string, name: string): AllowedCall[] => {
-    let result = generated.get(preset);
-    if (!result) {
-      const chainNamespace = network.chain as ForeignChainNamespace;
-      const { rules, readiness } = PushChain.utils.agentic.presets.get(preset, { chainNamespace, assets });
-      const chain = readiness.chains.find((c) => c.chainNamespace === chainNamespace);
-      result = {
-        calls: rules.flatMap((r) => r.allowedCalls),
-        disabled: (chain?.disabledCalls ?? []).map((c) => key(c.target, c.selector)),
-      };
-      generated.set(preset, result);
+    let calls = generated.get(preset);
+    if (!calls) {
+      const { rules } = PushChain.utils.agentic.presets.get(preset, {
+        chainNamespace: network.chain as ForeignChainNamespace,
+        ...(eth ? { assets: [{ token: eth.token, maxPerCall: eth.maxPerCall, maxTotal: eth.maxTotal ?? 0n }] } : {}),
+      });
+      calls = rules.flatMap((r) => r.allowedCalls);
+      generated.set(preset, calls);
     }
-    const calls = result.calls.filter((call) => key(call.target, call.selector) === key(target, selector));
-    const disabled = result.disabled.filter((k) => k === key(target, selector)).length;
-    if (!calls.length || disabled >= calls.length) {
-      throw new AgenticInputError(`${name} needs one of its tokens in Allowed Tokens to move any amount.`);
-    }
-    return calls;
+    const matching = calls.filter((call) => key(call.target, call.selector) === key(target, selector));
+    if (!matching.length) throw new AgenticInputError(`${name} isn't available on ${network.name} yet.`);
+    return matching;
   };
 };
 
@@ -219,69 +215,42 @@ const ruleAssets = (rule: AgenticRule): NonNullable<Rule['assets']> => {
   });
 };
 
+const isNativeAsset = (asset: NonNullable<Rule['assets']>[number]) =>
+  (typeof asset.token === 'string' ? asset.token : (asset.token as { address?: string }).address) === zeroAddress;
+
+/* Moveable token constant meaning "every token Push can send to this chain, at default limits". */
+const allTokens = (network: AgenticNetwork) =>
+  Object.values(PushChain.CONSTANTS.MOVEABLE.TOKEN).find(
+    (tokens) => (tokens as { ALL?: { chain?: string } }).ALL?.chain === network.chain,
+  ) as unknown as { ALL: NonNullable<Rule['assets']>[number]['token'] } | undefined;
+
 /*
- * Why a preset rule cannot be created yet, from the SDK's readiness for its current
- * tokens and limits (rechecked after every edit). Empty when it is ready, or when the
- * rule did not come from a preset. Missing token routes are named by token and network.
+ * A preset draft whose apps the owner hasn't changed and whose only token is ETH is
+ * regenerated from the preset: every cap (wrap value, approvals, swap and supply amounts)
+ * follows the ETH limits, as the SDK asks. Anything else is built as a custom rule.
  */
-export const presetReadinessIssues = (rule: AgenticRule): string[] => {
-  if (!rule.preset) return [];
-  const network = getNetwork(rule.networkId);
-  try {
-    const chainNamespace = network.chain as ForeignChainNamespace;
-    const agent = /^0x[0-9a-fA-F]{40}$/.test(rule.agentAddress) ? (getAddress(rule.agentAddress) as `0x${string}`) : undefined;
-    const gas = rule.maxGasPerCall.trim() ? parseEther(rule.maxGasPerCall.replace(/,/g, '')) : undefined;
-    const { readiness } = PushChain.utils.agentic.presets.get(rule.preset, {
-      chainNamespace,
-      assets: ruleAssets(rule),
-      ...(agent ? { agent, validUntil: resolveValidUntil(rule) } : {}),
-      ...(gas !== undefined ? { maxGasPerCall: gas } : {}),
-    });
-    const chain = readiness.chains.find((c) => c.chainNamespace === chainNamespace);
-    const issues = (chain?.issues ?? []).map((issue) => {
-      if (issue.code === 'BRIDGE_ASSET_UNAVAILABLE' && issue.token) {
-        const symbol = findToken(network.id, issue.token)?.symbol ?? `${issue.token.slice(0, 6)}…`;
-        return `${symbol} can't be sent from Push to ${network.name} yet. Remove it or choose a token with a Push route.`;
-      }
-      // The agent field has its own validation; an empty one isn't reported twice.
-      return issue.code === 'AGENT_REQUIRED' ? '' : issue.message;
-    });
-    return [...new Set(issues.filter(Boolean))];
-  } catch (error) {
-    return [describeAgenticError(error)];
-  }
+const regeneratedPreset = (
+  rule: AgenticRule,
+  network: AgenticNetwork,
+  assets: NonNullable<Rule['assets']>,
+  validUntil: number,
+  maxGasPerCall: bigint,
+): Rule | null => {
+  if (!rule.preset || rule.presetApps !== ruleAppsKey(rule.apps)) return null;
+  if (assets.length !== 1 || !isNativeAsset(assets[0])) return null;
+  const { rules } = PushChain.utils.agentic.presets.get(rule.preset, {
+    chainNamespace: network.chain as ForeignChainNamespace,
+    agent: getAddress(rule.agentAddress) as `0x${string}`,
+    validUntil,
+    maxGasPerCall,
+    assets: [{ token: assets[0].token, maxPerCall: assets[0].maxPerCall, maxTotal: assets[0].maxTotal ?? 0n }],
+  });
+  return rules[0] ?? null;
 };
 
 export const toSdkRule = (rule: AgenticRule): Rule => {
   const network = getNetwork(rule.networkId);
   const assets = ruleAssets(rule);
-
-  const compilePreset = presetCompiler(network, assets);
-  const allowedCalls: AllowedCall[] = isSolanaNetwork(rule.networkId)
-    ? solanaCalls(rule, network, assets)
-    : rule.apps.flatMap((ruleApp) => {
-    const target = appTarget(ruleApp, network);
-    const app = getApp(ruleApp.appId);
-    return appSignatures(ruleApp).flatMap((selector): AllowedCall[] => {
-      const catalogFn = app?.functions.find((fn) => fn.signature === selector);
-      // A catalog function is regenerated by the SDK from this rule's tokens: token pins and amount caps.
-      if (catalogFn?.preset) return compilePreset(catalogFn.preset, target, selector, `${catalogFn.label} on ${app?.name}`);
-      const pins = ruleApp.pins?.[selectorKey(selector) ?? ''];
-      return [{ target, selector: selector as AllowedCall['selector'], ...(pins?.length ? { pins } : {}) }];
-    });
-      });
-  // A function picked twice (or under two apps on one contract) must not grant its calls twice.
-  const seen = new Set<string>();
-  const uniqueCalls = allowedCalls.filter((call) => {
-    const key = JSON.stringify(call, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)).toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  allowedCalls.splice(0, allowedCalls.length, ...uniqueCalls);
-  if (!allowedCalls.length) throw new AgenticInputError('Add at least one app function.');
-  if (allowedCalls.length > 32) throw new AgenticInputError('A rule can allow at most 32 app functions.');
-
   const validUntil = resolveValidUntil(rule);
 
   let maxGasPerCall: bigint;
@@ -291,18 +260,115 @@ export const toSdkRule = (rule: AgenticRule): Rule => {
     throw new AgenticInputError(`Max gas per call "${rule.maxGasPerCall}" is not a valid PC amount.`);
   }
 
+  const preset = regeneratedPreset(rule, network, assets, validUntil, maxGasPerCall);
+  if (preset) return preset;
+
+  const apps = rule.apps.filter((ruleApp) => !isRuleAppEmpty(ruleApp));
+  const solana = isSolanaNetwork(rule.networkId);
+  const compilePreset = presetCompiler(network, assets);
+  const allowedCalls: AllowedCall[] = solana
+    ? solanaCalls({ ...rule, apps }, network, assets)
+    : apps.flatMap((ruleApp) => {
+        const target = appTarget(ruleApp, network);
+        const app = getApp(ruleApp.appId);
+        return appSignatures(ruleApp).flatMap((selector): AllowedCall[] => {
+          const catalogFn = app?.functions.find((fn) => fn.signature === selector);
+          // A catalog function comes from its preset, with the preset's pins and caps.
+          if (catalogFn?.preset) return compilePreset(catalogFn.preset, target, selector, `${catalogFn.label} on ${app?.name}`);
+          const pins = ruleApp.pins?.[selectorKey(selector) ?? ''];
+          const maxValue = ruleApp.maxValues?.[selectorKey(selector) ?? ''];
+          return [
+            {
+              target,
+              selector: selector as AllowedCall['selector'],
+              ...(pins?.length ? { pins } : {}),
+              ...(maxValue ? { maxValue } : {}),
+            },
+          ];
+        });
+      });
+  // A function picked twice (or under two apps on one contract) must not grant its calls twice.
+  const seen = new Set<string>();
+  const uniqueCalls = allowedCalls.filter((call) => {
+    const key = JSON.stringify(call, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  // Without an app, an EVM rule lets the agent send its tokens back to the owner only (the SDK adds those transfers).
+  if (!uniqueCalls.length && solana) throw new AgenticInputError(`Add at least one app on ${network.name}.`);
+  if (uniqueCalls.length > 32) throw new AgenticInputError('A rule can allow at most 32 app functions.');
+
+  // No tokens selected means every token Push can send to this chain, each at the SDK's default limits.
+  const all = allTokens(network);
+  if (!assets.length && !all) throw new AgenticInputError(`Select at least one token on ${network.name}.`);
+
   return {
     agent: getAddress(rule.agentAddress) as `0x${string}`,
     chainNamespace: network.chain as ForeignChainNamespace,
-    assets,
+    assets: assets.length ? assets : [{ token: all!.ALL } as NonNullable<Rule['assets']>[number]],
     maxGasPerCall,
     validUntil,
-    allowedCalls,
+    allowedCalls: uniqueCalls,
   };
+};
+
+/*
+ * What "no tokens selected" expands to on a network, as the SDK will grant it: every
+ * token Push can send there at its default limits (native ETH/BNB only when the rule has
+ * an app). Shown on the review before signing.
+ */
+export const allTokenLimits = (rule: AgenticRule): RuleToken[] => {
+  const network = getNetwork(rule.networkId);
+  let expanded: { token: { address?: string } | string; maxPerCall: bigint; maxTotal?: bigint }[] = [];
+  try {
+    expanded = PushChain.utils.agentic.assets.all(network.chain as ForeignChainNamespace) as typeof expanded;
+  } catch {
+    return [];
+  }
+  const withApps = rule.apps.some((ruleApp) => !isRuleAppEmpty(ruleApp));
+  const rows = expanded.flatMap((asset) => {
+    const address = typeof asset.token === 'string' ? asset.token : asset.token.address ?? '';
+    if (!withApps && address === zeroAddress) return [];
+    const token = findToken(network.id, address);
+    if (!token) return [];
+    return [{ token, totalLimit: formatLimit(asset.maxTotal, token.decimals), perTxLimit: formatLimit(asset.maxPerCall, token.decimals) }];
+  });
+  return rows;
 };
 
 const formatLimit = (value: bigint | undefined, decimals: number) =>
   value === undefined || value === maxUint256 ? '' : formatUnits(value, decimals);
+
+/* Full signatures the SDK presets use on a contract, by network: stored rules keep only 4-byte selectors. */
+const presetSignatureCache = new Map<string, Map<string, string[]>>();
+const presetSignatures = (networkId: string, target: string): string[] => {
+  let byTarget = presetSignatureCache.get(networkId);
+  if (!byTarget) {
+    byTarget = new Map();
+    const network = getNetwork(networkId);
+    try {
+      const { presets } = PushChain.utils.agentic;
+      presets
+        .list()
+        .presets.filter((preset) => preset.chains.some((chain) => chain === network.chain))
+        .forEach((preset) =>
+          presets
+            .get(preset.constant, { chainNamespace: network.chain as ForeignChainNamespace })
+            .rules.flatMap((r) => r.allowedCalls)
+            .forEach((call) => {
+              if (!call.selector.includes('(')) return;
+              const key = call.target.toLowerCase();
+              byTarget!.set(key, [...new Set([...(byTarget!.get(key) ?? []), call.selector])]);
+            }),
+        );
+    } catch {
+      // No presets for this network
+    }
+    presetSignatureCache.set(networkId, byTarget);
+  }
+  return byTarget.get(target.toLowerCase()) ?? [];
+};
 
 /** Groups allowedCalls back into apps, naming them from the catalog or the custom registry. */
 const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[] => {
@@ -315,18 +381,22 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
   return Array.from(byTarget.entries()).map(([target, targetCalls]) => {
     const app = AGENTIC_APPS.find((a) => a.contracts?.[networkId]?.toLowerCase() === target);
     const known = (app?.functions ?? []).filter((f) => f.signature);
-    // Signatures known for this contract: saved under the app, or under its address before the app was listed.
+    // Signatures known for this contract: saved under the app, under its address before the app was listed,
+    // or from a preset that calls it (e.g. Aave's own WETH reserve).
     const customSignatures = [
       ...registry.getFunctions(networkId, app?.id ?? target),
       ...(app ? registry.getFunctions(networkId, target) : []),
+      ...presetSignatures(networkId, target),
     ];
 
     const functionIds: string[] = [];
     const customFunctions: string[] = [];
     const pins: Record<string, Pin[]> = {};
+    const maxValues: Record<string, bigint> = {};
     targetCalls.forEach((call) => {
       const selector = selectorKey(call.selector) ?? call.selector.toLowerCase();
       if (call.pins?.length) pins[selector] = call.pins;
+      if (call.maxValue) maxValues[selector] = call.maxValue;
       const catalogFn = known.find((f) => functionSelector(f.signature!)?.toLowerCase() === selector);
       if (catalogFn) {
         // A preset sends one call per token direction for the same function; it is selected once
@@ -342,7 +412,10 @@ const decodeApps = (networkId: string, calls: readonly AllowedCall[]): RuleApp[]
       if (!customFunctions.includes(custom ?? call.selector)) customFunctions.push(custom ?? call.selector);
     });
 
-    const extra = Object.keys(pins).length ? { pins } : {};
+    const extra = {
+      ...(Object.keys(pins).length ? { pins } : {}),
+      ...(Object.keys(maxValues).length ? { maxValues } : {}),
+    };
     return app
       ? { appId: app.id, functionIds, customFunctions, ...extra }
       : { appId: null, functionIds, customContract: getAddress(target), customFunctions, ...extra };
@@ -399,6 +472,41 @@ const fromSolanaRecord = (record: RulesRecord, rule: DecodedSolanaRule, network:
   };
 };
 
+/*
+ * The transfer(address,uint256) the SDK adds on each token's own contract for a rule
+ * without apps (the agent may send that token back to the owner). It belongs to the
+ * tokens, not an app, and is added again when the rule is saved without apps.
+ */
+const isTokenReturnTransfer = (call: AllowedCall, assets: NonNullable<Rule['assets']>) =>
+  (call.selector === 'transfer(address,uint256)' || call.selector.toLowerCase() === '0xa9059cbb') &&
+  assets.some((asset) => {
+    const address = typeof asset.token === 'string' ? asset.token : asset.token.address;
+    return address.toLowerCase() === call.target.toLowerCase();
+  });
+
+/*
+ * On-chain rules don't record which preset made them. A rule whose calls are exactly a
+ * preset's (same contracts and functions) is treated as that preset again, so editing its
+ * ETH limits regenerates every cap from the preset instead of keeping stale ones.
+ */
+const matchingPreset = (network: AgenticNetwork, calls: readonly AllowedCall[]): PresetCategory | undefined => {
+  const shape = (list: readonly { target: string; selector: string }[]) =>
+    [...new Set(list.map((call) => `${call.target.toLowerCase()}:${selectorKey(call.selector)}`))].sort().join('|');
+  const ruleShape = shape(calls);
+  try {
+    const { presets } = PushChain.utils.agentic;
+    return presets
+      .list()
+      .presets.filter((preset) => preset.chains.some((chain) => chain === network.chain))
+      .find((preset) => {
+        const { rules } = presets.get(preset.constant, { chainNamespace: network.chain as ForeignChainNamespace });
+        return shape(rules.flatMap((r) => r.allowedCalls)) === ruleShape;
+      })?.constant;
+  } catch {
+    return undefined;
+  }
+};
+
 /** A granted rule as the screens show it, or null for rule kinds the screens do not support yet. */
 export const fromRulesRecord = (record: RulesRecord): AgenticRule | null => {
   const network = AGENTIC_NETWORKS.find((n) => n.chain === record.chainNamespace);
@@ -419,11 +527,16 @@ export const fromRulesRecord = (record: RulesRecord): AgenticRule | null => {
     };
   });
 
+  const calls = rule.allowedCalls.filter((call) => !isTokenReturnTransfer(call, assets));
+  const apps = decodeApps(network.id, calls);
+  const preset = matchingPreset(network, calls);
+
   return {
+    ...(preset ? { preset, presetApps: ruleAppsKey(apps) } : {}),
     id: record.rulesId,
     rulesId: record.rulesId,
     networkId: network.id,
-    apps: decodeApps(network.id, rule.allowedCalls),
+    apps,
     tokens,
     maxGasPerCall: formatEther(rule.maxGasPerCall ?? 0n),
     agentAddress: record.agent,
@@ -499,6 +612,10 @@ export const describeAgenticError = (error: unknown): string => {
   if (error instanceof AgenticError) return error.hint ? `${error.message} ${error.hint}` : error.message;
   if (error instanceof Error) {
     if (/user rejected|denied/i.test(error.message)) return 'The request was rejected in your wallet.';
+    // RPC failures (e.g. the node rate-limiting with HTTP 429) carry the whole request in their message.
+    if (/HTTP request failed|Failed to fetch|fetch failed|429|Too Many Requests|timed? ?out/i.test(error.message)) {
+      return "Push Chain's network didn't respond. Nothing was signed; please try again in a moment.";
+    }
     return error.message;
   }
   return 'Something went wrong. Please try again.';

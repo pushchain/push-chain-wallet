@@ -209,7 +209,8 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
       rules
         .flatMap((rule) => rule.allowedCalls)
         .forEach((call) => {
-          if (!call.app || !call.selector.includes('(')) return;
+          // Token approvals (on the token's own contract) are the preset's permissions, not app functions.
+          if (!call.app || !call.selector.includes('(') || call.selector.startsWith('approve(')) return;
           const id = appId(call.app);
           let app = byId.get(id);
           if (!app) {
@@ -231,7 +232,9 @@ const withSdkCatalog = (apps: AgenticApp[]): AgenticApp[] => {
             app.functions.push({
               id: call.selector,
               // Labels of zero-cap review calls carry a hint, e.g. "Swap exact input (select two tokens to enable)".
-              label: call.label?.replace(/\s*\(select [^)]*\)$/, '') ?? call.selector.split('(')[0],
+              // Hints such as "(select two tokens to enable)", and a swap's direction ("(WETH to USDC)"):
+              // one function covers both directions.
+              label: call.label?.replace(/\s*\((select [^)]*|[^)]+ to [^)]+)\)$/, '') ?? call.selector.split('(')[0],
               signature: call.selector,
               ...(call.pins?.length ? { pins: call.pins } : {}),
               preset: preset.constant,

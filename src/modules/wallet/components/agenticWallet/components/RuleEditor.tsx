@@ -271,9 +271,12 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
   const registrySnapshot = useAgenticRegistry();
   const catalogApps = getAppsForNetwork(rule.networkId);
   // A saved custom contract that the catalog now covers (e.g. from the SDK) shows once, as the catalog app.
+  // Also hidden: contracts a preset named after a listed app (its token approvals, e.g. USDC as "Uniswap V3").
   const customApps = (registrySnapshot.apps[rule.networkId] ?? []).filter(
     (custom) =>
-      !catalogApps.some((a) => a.contracts?.[rule.networkId]?.toLowerCase() === custom.address.toLowerCase()),
+      !catalogApps.some(
+        (a) => a.contracts?.[rule.networkId]?.toLowerCase() === custom.address.toLowerCase() || a.name === custom.name,
+      ),
   );
   const [sheet, setSheet] = useState<SheetState | null>(null);
 
@@ -315,7 +318,12 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
       </Field>
 
       <Section gap="var(--spacing-sm)">
-        <SectionHeading title="Allowed Apps" description="Add apps and functions that agents are allowed to interact with." />
+        <SectionHeading
+          title="Allowed Apps"
+          // On EVM networks a rule may hold only tokens: the agent can then send them back to the owner.
+          tag={solana ? undefined : 'Optional'}
+          description="Add apps and functions that agents are allowed to interact with."
+        />
         {rule.apps.map((ruleApp, index) => {
           const app = getApp(ruleApp.appId);
           const key = appKey(ruleApp);
@@ -352,16 +360,20 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
               <CardLabel
                 label={`App ${index + 1}`}
                 // An empty only card has nothing to delete (deleting would leave the same empty card).
-                menuDisabled={rule.apps.length === 1 && !hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) === 0}
+                // Solana needs an app, so its only (empty) card has nothing to delete.
+                menuDisabled={
+                  solana && rule.apps.length === 1 && !hasRuleAppTarget(ruleApp) && getRuleAppFunctionCount(ruleApp) === 0
+                }
                 menuItems={[
                   {
                     key: 'delete',
                     label: 'Delete App',
                     icon: <OptOut size={24} />,
-                    // Deleting the only app leaves an empty one, so the rule always has an app card.
+                    // Apps are optional on EVM, like tokens: deleting the last one leaves just "Add new app".
+                    // On Solana the rule keeps an (empty) app card to fill in.
                     onSelect: () => {
                       const apps = rule.apps.filter((_, i) => i !== index);
-                      onChange({ ...rule, apps: apps.length ? apps : [{ appId: null, functionIds: [] }] });
+                      onChange({ ...rule, apps: apps.length || !solana ? apps : [{ appId: null, functionIds: [] }] });
                     },
                   },
                 ]}
@@ -387,11 +399,25 @@ const StepOneFields: FC<{ rule: AgenticRule; onChange: (rule: AgenticRule) => vo
                           ...(contract ? { description: maskAddress(contract), copyValue: contract } : {}),
                         };
                       }),
+                      // Contracts the owner added live in this browser's storage; the bin removes them there.
                       ...customApps.map((a) => ({
                         value: `${CUSTOM_APP_PREFIX}${a.address}`,
                         label: a.name,
                         description: maskAddress(a.address),
                         copyValue: getAddress(a.address),
+                        deleteLabel: 'Delete custom contract',
+                        onDelete: () => {
+                          registry.removeApp(rule.networkId, a.address);
+                          // App cards in this rule that used it start over.
+                          onChange({
+                            ...rule,
+                            apps: rule.apps.map((ruleApp) =>
+                              ruleApp.customContract?.toLowerCase() === a.address.toLowerCase()
+                                ? { appId: null, functionIds: [] }
+                                : ruleApp,
+                            ),
+                          });
+                        },
                       })),
                     ]}
                     onChange={(value) =>
