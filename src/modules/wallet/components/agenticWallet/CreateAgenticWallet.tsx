@@ -13,6 +13,7 @@ import { RuleEditor, RuleStep, TokenIcon } from './components/RuleEditor';
 import { RulesByNetwork } from './components/RuleSummary';
 import { useAgenticWallets } from './AgenticWalletContext';
 import { usePushChain } from '../../../../context/PushChainContext';
+import { ProgressLabel } from './components/ProgressLabel';
 
 type CreateAgenticWalletProps = {
   pushWalletAddress: string;
@@ -266,7 +267,7 @@ const CreateAgenticWallet: FC<CreateAgenticWalletProps> = ({ pushWalletAddress, 
           <Footer>
             {(ambiguity || submitError) && <ErrorText>{ambiguity ?? submitError}</ErrorText>}
             <PrimaryButton type="button" disabled={!rules.length || !!ambiguity || submitting} onClick={handleCreate}>
-              {submitting ? 'Creating agentic wallet…' : 'Create agentic wallet'}
+              {submitting ? <ProgressLabel fallback="Creating agentic wallet…" /> : 'Create agentic wallet'}
             </PrimaryButton>
           </Footer>
         </>

@@ -16,6 +16,7 @@ import { AgenticNetwork, CustomToken } from '../agenticWallet.types';
 import { isEvmAddress } from '../agenticWallet.utils';
 import { BottomSheet, SheetBody } from './BottomSheet';
 import { Field, TextAreaField, TextField } from './FormControls';
+import { ProgressLabel } from './ProgressLabel';
 
 type Lookup<T> = { state: 'idle' } | { state: 'loading' } | { state: 'found'; value: T } | { state: 'missing' };
 
@@ -322,7 +323,7 @@ export const RenameWalletSheet: FC<RenameWalletSheetProps> = ({ currentName, onC
         <SubmitColumn>
           {error && <ErrorText>{error}</ErrorText>}
           <PrimaryButton type="button" disabled={!valid || busy} onClick={submit}>
-            {busy ? 'Renaming… confirm in your wallet' : 'Rename Wallet'}
+            {busy ? <ProgressLabel fallback="Renaming… confirm in your wallet" /> : 'Rename Wallet'}
           </PrimaryButton>
         </SubmitColumn>
       </SheetBody>
@@ -363,11 +364,14 @@ export const DeleteRuleSheet: FC<DeleteRuleSheetProps> = ({ ruleNumber, onClose,
       <ConfirmBody>
         {error && <ErrorText>{error}</ErrorText>}
         <ButtonRow>
-          <OutlineButton type="button" disabled={busy} onClick={onClose}>
-            Cancel
-          </OutlineButton>
+          {/* Can't cancel once signing starts, so Delete takes the full row to fit its status */}
+          {!busy && (
+            <OutlineButton type="button" onClick={onClose}>
+              Cancel
+            </OutlineButton>
+          )}
           <PrimaryButton type="button" disabled={busy} onClick={confirm}>
-            {busy ? 'Deleting…' : 'Delete Rule'}
+            {busy ? <ProgressLabel fallback="Deleting…" /> : 'Delete Rule'}
           </PrimaryButton>
         </ButtonRow>
       </ConfirmBody>
@@ -383,15 +387,12 @@ const ConfirmBody = styled.div`
   padding-top: 19px;
 `;
 
-/* Cancel and Delete Rule split the row equally, as in the design */
+/* Cancel and Delete Rule split the row equally, as in the design; Delete fills it while deleting */
 const ButtonRow = styled.div`
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--spacing-xs);
-
-  > button {
-    flex: 1 1 0;
-    min-width: 0;
-  }
 `;
 
 const SubmitColumn = styled.div`

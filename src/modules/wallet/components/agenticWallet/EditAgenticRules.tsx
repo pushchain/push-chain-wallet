@@ -11,6 +11,7 @@ import { ScreenTitle, StepTabs } from './components/FormControls';
 import { RuleEditor, RuleStep } from './components/RuleEditor';
 import { RulesByNetwork } from './components/RuleSummary';
 import { useAgenticWallets } from './AgenticWalletContext';
+import { ProgressLabel } from './components/ProgressLabel';
 
 export type EditRulesEntry = { mode: 'list' } | { mode: 'add' } | { mode: 'edit'; index: number };
 
@@ -139,7 +140,7 @@ const EditAgenticRules: FC<EditAgenticRulesProps> = ({ wallet, entry, onExit, on
           <Footer>
             {(ambiguity || submitError) && <ErrorText>{ambiguity ?? submitError}</ErrorText>}
             <PrimaryButton type="button" disabled={unchanged || !!ambiguity || submitting} onClick={handleSave}>
-              {submitting ? 'Updating rules…' : 'Update agentic wallet rules'}
+              {submitting ? <ProgressLabel fallback="Updating rules…" /> : 'Update agentic wallet rules'}
             </PrimaryButton>
           </Footer>
         </>

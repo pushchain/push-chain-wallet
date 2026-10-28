@@ -184,9 +184,11 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
             overflow="hidden scroll"
             height="318px"
             customScrollbar
+            css={emptyListHintCss}
           >
             {loadingTokenDetails && <Spinner size="large" variant="primary" />}
             {filteredOriginTokens.length > 0 && (
+              <div data-token-row style={{ display: 'contents' }}>
                 <OriginChainTokenList
                     originWalletAddress={parsedWallet}
                     tokens={filteredOriginTokens}
@@ -201,6 +203,7 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                         })
                     }
                 />
+              </div>
             )}
             {filteredOtherTokens.map((token: TokenFormat) => (
                 <TokensListItem
@@ -231,6 +234,14 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
                 })}
               />
             )}
+            {/* Rows hide tokens with no balance, so a wallet holding nothing would show a blank list. */}
+            {!loadingTokenDetails && hasMatchingTokens && !searchError && (
+              <Text variant="bs-regular" color="pw-int-text-secondary-color" data-empty-hint>
+                {searchQuery.trim()
+                  ? 'No tokens with a balance match your search. Enter a token address and press Enter to load one.'
+                  : 'No tokens with a balance in this wallet yet. Fund it first, or enter a token address and press Enter.'}
+              </Text>
+            )}
             {!loadingTokenDetails && !hasMatchingTokens && !searchError && (
               <Text variant="bs-regular" color="pw-int-text-secondary-color">
                 No matching tokens yet. Enter a contract address and press Enter to load one.
@@ -256,3 +267,23 @@ const SelectToken: FC<SelectTokenProps> = ({ handleTokenSelection }) => {
 };
 
 export { SelectToken };
+
+/*
+ * The hint shows only when no row is visible (every token has a zero balance). It fades in
+ * after a moment so it doesn't flash while balances are still loading.
+ */
+const emptyListHintCss = css`
+  [data-empty-hint] {
+    display: none;
+  }
+  &:not(:has([data-token-row])) [data-empty-hint] {
+    display: block;
+    opacity: 0;
+    animation: empty-hint-in 0.2s ease-out 1.5s forwards;
+  }
+  @keyframes empty-hint-in {
+    to {
+      opacity: 1;
+    }
+  }
+`;

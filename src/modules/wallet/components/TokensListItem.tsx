@@ -36,6 +36,8 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
   }
 
   return (
+    // Marks a visible row: lists can tell when every row is hidden (zero or loading balance).
+    <div data-token-row style={{ display: 'contents' }}>
     <Box
       display="flex"
       padding="spacing-xs"
@@ -105,6 +107,7 @@ const TokensListItem: FC<TokenListItemProps> = ({ token, walletDetails, isMoveab
         </Text>
       </Box> */}
     </Box>
+    </div>
   );
 };
 
